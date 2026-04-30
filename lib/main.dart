@@ -2,7 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
+
+// AUTH
 import 'screens/auth/splash_page.dart';
+import 'screens/auth/login_page.dart';
+
+// HOME
+import 'screens/home/home_page.dart';
+
+// INVENTORY
+import 'screens/inventory/add_item_page.dart';
+
+// SUGGESTIONS
+import 'screens/suggestions/suggestions_page.dart';
+
+// ALERTS
+import 'screens/alerts/alerts_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,8 +35,22 @@ class VeloraApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Velora',
-      theme: ThemeData(fontFamily: 'Poppins', primarySwatch: Colors.deepPurple),
+
+      theme: ThemeData(
+        fontFamily: 'Poppins',
+        primarySwatch: Colors.deepPurple,
+        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+      ),
+
       home: const SplashPage(),
+
+      routes: {
+        '/login': (context) => const LoginPage(),
+        '/home': (context) => const HomePage(),
+        '/add-item': (context) => const AddItemPage(),
+        '/suggestions': (context) => const SuggestionsPage(),
+        '/alerts': (context) => const AlertsPage(), // ✅ NOW MATCH
+      },
     );
   }
 }

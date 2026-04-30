@@ -27,52 +27,51 @@ class DashboardPage extends StatelessWidget {
             children: [
               _header(),
               const SizedBox(height: 18),
-
-              // Real-time total items, near expiry, low stock
               _realOverviewCard(),
-
               const SizedBox(height: 18),
               _sectionTitle('Quick Actions'),
               const SizedBox(height: 12),
-
-              const Row(
+              Row(
                 children: [
                   Expanded(
                     child: DashboardQuickActionCard(
                       icon: Icons.add_box_outlined,
                       title: 'Add Item',
                       color: purple,
+                      onTap: () {
+                        Navigator.pushNamed(context, '/add-item');
+                      },
                     ),
                   ),
-                  SizedBox(width: 10),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: DashboardQuickActionCard(
                       icon: Icons.lightbulb_outline_rounded,
                       title: 'AI Suggestions',
                       color: green,
+                      onTap: () {
+                        Navigator.pushNamed(context, '/suggestions');
+                      },
                     ),
                   ),
-                  SizedBox(width: 10),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: DashboardQuickActionCard(
                       icon: Icons.notifications_none_rounded,
                       title: 'Alerts',
                       color: orange,
+                      onTap: () {
+                        Navigator.pushNamed(context, '/alerts');
+                      },
                     ),
                   ),
                 ],
               ),
-
               const SizedBox(height: 22),
               _sectionTitle('Today Overview'),
               const SizedBox(height: 12),
-
-              // Real-time stock in and stock out today
               const TodayOverviewSection(),
-
               const SizedBox(height: 16),
-
-              // Real-time weekly stock in and stock out chart
               const DashboardChartCard(),
             ],
           ),
