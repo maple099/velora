@@ -1,46 +1,97 @@
 import 'package:flutter/material.dart';
 
-import '../../widgets/dashboard_chart_card.dart';
-import '../../widgets/dashboard_overview_card.dart';
-import '../../widgets/dashboard_quick_action_card.dart';
-import '../../widgets/dashboard_today_card.dart';
+import '../../logic/firestore_service.dart';
+import '../../models/inventory_item.dart';
+import '../../widgets/dashboard/dashboard_chart_card.dart';
+import '../../widgets/dashboard/dashboard_overview_card.dart';
+import '../../widgets/dashboard/dashboard_quick_action_card.dart';
+import '../../widgets/dashboard/dashboard_today_card.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
 
+  int _nearExpiryCount(List<InventoryItem> items) {
+    return items.where((item) {
+      final daysLeft = item.expiryDate.difference(DateTime.now()).inDays;
+      return daysLeft >= 0 && daysLeft <= 3;
+    }).length;
+  }
+
+  int _lowStockCount(List<InventoryItem> items) {
+    return items.where((item) => item.quantity <= 2).length;
+  }
+
+  int _totalQuantity(List<InventoryItem> items) {
+    return items.fold(0, (total, item) => total + item.quantity);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(),
-            const SizedBox(height: 22),
-            const DashboardOverviewCard(),
-            const SizedBox(height: 20),
-            _buildSectionTitle('Quick Actions'),
-            const SizedBox(height: 12),
-            const DashboardQuickActionCard(),
-            const SizedBox(height: 24),
-            _buildSectionTitle('Today Overview'),
-            const SizedBox(height: 12),
-            const DashboardTodayCard(),
-            const SizedBox(height: 16),
-            const DashboardChartCard(),
-          ],
-        ),
-      ),
+    return StreamBuilder<List<InventoryItem>>(
+      stream: FirestoreService.instance.getItems(),
+      builder: (context, snapshot) {
+        final items = snapshot.data ?? [];
+
+        final totalItems = items.length;
+        final nearExpiry = _nearExpiryCount(items);
+        final lowStock = _lowStockCount(items);
+        final stockIn = _totalQuantity(items);
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF8FAFC),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 100),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _header(),
+                  const SizedBox(height: 22),
+                  DashboardOverviewCard(
+                    totalItems: totalItems,
+                    nearExpiry: nearExpiry,
+                    lowStock: lowStock,
+                  ),
+                  const SizedBox(height: 22),
+                  _sectionTitle('Quick Actions'),
+                  const SizedBox(height: 14),
+                  const DashboardQuickActionCard(),
+                  const SizedBox(height: 26),
+                  _sectionTitle('Today Overview'),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DashboardTodayCard(
+                          title: 'Stock In',
+                          value: stockIn.toString(),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: DashboardTodayCard(
+                          title: 'Stock Out',
+                          value: '0',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  const DashboardChartCard(),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildHeader() {
+  Widget _header() {
     return Row(
       children: [
         const Icon(Icons.menu_rounded, size: 28, color: Color(0xFF111827)),
-        const SizedBox(width: 20),
+        const SizedBox(width: 18),
         const Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -48,63 +99,44 @@ class DashboardPage extends StatelessWidget {
               Text(
                 'Hi, Arif 👋',
                 style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 23,
+                  fontWeight: FontWeight.w900,
                   color: Color(0xFF111827),
                 ),
               ),
-              SizedBox(height: 4),
+              SizedBox(height: 3),
               Text(
                 "Here's what's happening today",
-                style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF6B7280),
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ],
           ),
         ),
-        Stack(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 12,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.notifications_none_rounded,
-                color: Color(0xFF374151),
-              ),
-            ),
-            Positioned(
-              right: 10,
-              top: 9,
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFEF4444),
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
-          ],
+        Container(
+          width: 45,
+          height: 45,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: const Icon(
+            Icons.notifications_none_rounded,
+            color: Color(0xFF111827),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildSectionTitle(String title) {
+  Widget _sectionTitle(String title) {
     return Text(
       title,
       style: const TextStyle(
-        fontSize: 16,
+        fontSize: 17,
         fontWeight: FontWeight.w800,
         color: Color(0xFF111827),
       ),
