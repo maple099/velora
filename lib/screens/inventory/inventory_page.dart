@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../models/inventory_item.dart';
+import '../../services/local_inventory_service.dart';
+
 class InventoryPage extends StatefulWidget {
   const InventoryPage({super.key});
 
@@ -9,45 +12,6 @@ class InventoryPage extends StatefulWidget {
 
 class _InventoryPageState extends State<InventoryPage> {
   String selectedFilter = 'All Items';
-
-  final List<_InventoryItem> items = const [
-    _InventoryItem(
-      name: 'Chicken Breast',
-      category: 'Meat',
-      amount: '2.5kg',
-      expiry: '24 Aug 2026',
-      image: '🍗',
-      alert: 'Low Stock',
-    ),
-    _InventoryItem(
-      name: 'Fresh Milk',
-      category: 'Dairy',
-      amount: '1L',
-      expiry: '25 Apr 2026',
-      image: '🥛',
-    ),
-    _InventoryItem(
-      name: 'Whipping Cream',
-      category: 'Dairy',
-      amount: '1L',
-      expiry: '26 Apr 2026',
-      image: '🍶',
-    ),
-    _InventoryItem(
-      name: 'Garlic',
-      category: 'Vegetable',
-      amount: '2.5kg',
-      expiry: '10 May 2026',
-      image: '🧄',
-    ),
-    _InventoryItem(
-      name: 'Tomato',
-      category: 'Vegetable',
-      amount: '2kg',
-      expiry: '19 May 2026',
-      image: '🍅',
-    ),
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +28,16 @@ class _InventoryPageState extends State<InventoryPage> {
             const SizedBox(height: 14),
             _filters(),
             const SizedBox(height: 16),
-            ...items.map((item) => _InventoryCard(item: item)),
+            ValueListenableBuilder<List<InventoryItem>>(
+              valueListenable: LocalInventoryService.itemsNotifier,
+              builder: (context, items, child) {
+                return Column(
+                  children: items
+                      .map((item) => _InventoryCard(item: item))
+                      .toList(),
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -72,19 +45,15 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   Widget _header() {
-    return Row(
+    return const Row(
       children: [
-        InkWell(
-          onTap: () {},
-          borderRadius: BorderRadius.circular(12),
-          child: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            size: 20,
-            color: Color(0xFF111827),
-          ),
+        Icon(
+          Icons.arrow_back_ios_new_rounded,
+          size: 20,
+          color: Color(0xFF111827),
         ),
-        const SizedBox(width: 18),
-        const Text(
+        SizedBox(width: 18),
+        Text(
           'Inventory',
           style: TextStyle(
             fontSize: 22,
@@ -176,7 +145,7 @@ class _InventoryPageState extends State<InventoryPage> {
 }
 
 class _InventoryCard extends StatelessWidget {
-  final _InventoryItem item;
+  final InventoryItem item;
 
   const _InventoryCard({required this.item});
 
@@ -208,7 +177,10 @@ class _InventoryCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
             ),
             child: Center(
-              child: Text(item.image, style: const TextStyle(fontSize: 32)),
+              child: Text(
+                item.imageEmoji,
+                style: const TextStyle(fontSize: 32),
+              ),
             ),
           ),
           const SizedBox(width: 13),
@@ -228,7 +200,7 @@ class _InventoryCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  '${item.category} • ${item.amount}',
+                  '${item.category} • ${item.quantity}${item.unit}',
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -236,53 +208,19 @@ class _InventoryCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 5),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Expiry: ${item.expiry}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF6B7280),
-                        ),
-                      ),
-                    ),
-                    if (item.alert != null)
-                      Text(
-                        item.alert!,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFFEF4444),
-                        ),
-                      ),
-                  ],
+                Text(
+                  'Expiry: ${item.expiryDate}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF6B7280),
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
           const Icon(Icons.chevron_right_rounded, color: Color(0xFF6B7280)),
         ],
       ),
     );
   }
-}
-
-class _InventoryItem {
-  final String name;
-  final String category;
-  final String amount;
-  final String expiry;
-  final String image;
-  final String? alert;
-
-  const _InventoryItem({
-    required this.name,
-    required this.category,
-    required this.amount,
-    required this.expiry,
-    required this.image,
-    this.alert,
-  });
 }

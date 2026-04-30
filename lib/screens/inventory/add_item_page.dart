@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../models/inventory_item.dart';
+import '../../services/local_inventory_service.dart';
+
 class AddItemPage extends StatefulWidget {
   const AddItemPage({super.key});
 
@@ -41,12 +44,49 @@ class _AddItemPageState extends State<AddItemPage> {
   }
 
   void _saveItem() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Item saved later with Firebase'),
-        behavior: SnackBarBehavior.floating,
-      ),
+    if (itemNameController.text.trim().isEmpty ||
+        quantityController.text.trim().isEmpty ||
+        selectedDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fill item name, quantity and expiry date'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final newItem = InventoryItem(
+      name: itemNameController.text.trim(),
+      category: selectedCategory,
+      quantity: quantityController.text.trim(),
+      unit: selectedUnit,
+      expiryDate: expiryText,
+      price: priceController.text.trim().isEmpty
+          ? '0.00'
+          : priceController.text.trim(),
+      imageEmoji: _emojiForCategory(selectedCategory),
     );
+
+    LocalInventoryService.addItem(newItem);
+    Navigator.pop(context);
+  }
+
+  String _emojiForCategory(String category) {
+    switch (category) {
+      case 'Meat':
+        return '🍗';
+      case 'Dairy':
+        return '🥛';
+      case 'Vegetable':
+        return '🥬';
+      case 'Fruit':
+        return '🍎';
+      case 'Bakery':
+        return '🍞';
+      default:
+        return '📦';
+    }
   }
 
   String get expiryText {
