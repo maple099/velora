@@ -11,9 +11,8 @@ class DashboardChartCard extends StatelessWidget {
       stream: FirestoreService.instance.getWeeklyActivityStream(),
       builder: (context, snapshot) {
         final data = snapshot.data ?? _emptyData();
-        final weeklyData = data.map((item) => item.total).toList();
 
-        return _ChartContent(weeklyData: weeklyData);
+        return _ChartContent(weeklyData: data);
       },
     );
   }
@@ -28,24 +27,39 @@ class DashboardChartCard extends StatelessWidget {
 }
 
 class _ChartContent extends StatelessWidget {
-  final List<int> weeklyData;
+  final List<WeeklyInventoryActivity> weeklyData;
 
   const _ChartContent({required this.weeklyData});
 
   int get _maxValue {
     if (weeklyData.isEmpty) return 1;
-    final max = weeklyData.reduce((a, b) => a > b ? a : b);
+
+    final max = weeklyData
+        .map((item) {
+          final bigger = item.stockIn > item.stockOut
+              ? item.stockIn
+              : item.stockOut;
+          return bigger;
+        })
+        .fold<int>(0, (a, b) => a > b ? a : b);
+
     return max == 0 ? 1 : max;
   }
 
+  int get _totalStockIn {
+    return weeklyData.fold(0, (sum, item) => sum + item.stockIn);
+  }
+
+  int get _totalStockOut {
+    return weeklyData.fold(0, (sum, item) => sum + item.stockOut);
+  }
+
   int get _totalThisWeek {
-    return weeklyData.fold(0, (sum, value) => sum + value);
+    return _totalStockIn + _totalStockOut;
   }
 
   @override
   Widget build(BuildContext context) {
-    final days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
@@ -79,16 +93,18 @@ class _ChartContent extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: List.generate(7, (index) {
-                    final value = weeklyData.length > index
+                    final item = weeklyData.length > index
                         ? weeklyData[index]
-                        : 0;
+                        : WeeklyInventoryActivity(
+                            day: '',
+                            stockIn: 0,
+                            stockOut: 0,
+                          );
 
                     return Expanded(
-                      child: _bar(
-                        value: value,
-                        day: days[index],
+                      child: _barGroup(
+                        item: item,
                         active: index == DateTime.now().weekday - 1,
-                        heightFactor: value / _maxValue,
                       ),
                     );
                   }),
@@ -97,6 +113,8 @@ class _ChartContent extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
+          _legend(),
+          const SizedBox(height: 12),
           _weeklyInsight(),
         ],
       ),
@@ -120,7 +138,7 @@ class _ChartContent extends StatelessWidget {
               ),
               SizedBox(height: 5),
               Text(
-                'Track your inventory changes this week',
+                'Real stock in and stock out this week',
                 style: TextStyle(
                   fontSize: 12,
                   color: Color(0xFF6B7280),
@@ -155,19 +173,22 @@ class _ChartContent extends StatelessWidget {
     );
   }
 
-  Widget _bar({
-    required int value,
-    required String day,
+  Widget _barGroup({
+    required WeeklyInventoryActivity item,
     required bool active,
-    required double heightFactor,
   }) {
-    final barHeight = value == 0 ? 9.0 : 78 * heightFactor;
+    final stockInHeight = item.stockIn == 0
+        ? 9.0
+        : 78 * (item.stockIn / _maxValue);
+    final stockOutHeight = item.stockOut == 0
+        ? 9.0
+        : 78 * (item.stockOut / _maxValue);
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         Text(
-          value.toString(),
+          item.total.toString(),
           style: TextStyle(
             fontSize: active ? 13 : 11,
             fontWeight: FontWeight.w900,
@@ -175,20 +196,24 @@ class _ChartContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 350),
-          width: 26,
-          height: barHeight,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            gradient: active
-                ? const LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0xFF7C3AED), Color(0xFFA855F7)],
-                  )
-                : null,
-            color: active ? null : const Color(0xFFEDE9FE),
+        SizedBox(
+          height: 78,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _smallBar(
+                height: stockInHeight,
+                color: const Color(0xFF7C3AED),
+                isEmpty: item.stockIn == 0,
+              ),
+              const SizedBox(width: 4),
+              _smallBar(
+                height: stockOutHeight,
+                color: const Color(0xFFF97316),
+                isEmpty: item.stockOut == 0,
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 8),
@@ -202,7 +227,7 @@ class _ChartContent extends StatelessWidget {
             borderRadius: BorderRadius.circular(18),
           ),
           child: Text(
-            day,
+            item.day,
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w900,
@@ -210,6 +235,33 @@ class _ChartContent extends StatelessWidget {
             ),
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _smallBar({
+    required double height,
+    required Color color,
+    required bool isEmpty,
+  }) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 350),
+      width: 9,
+      height: height,
+      decoration: BoxDecoration(
+        color: isEmpty ? const Color(0xFFEDE9FE) : color,
+        borderRadius: BorderRadius.circular(24),
+      ),
+    );
+  }
+
+  Widget _legend() {
+    return const Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _LegendItem(color: Color(0xFF7C3AED), label: 'Stock In'),
+        SizedBox(width: 18),
+        _LegendItem(color: Color(0xFFF97316), label: 'Stock Out'),
       ],
     );
   }
@@ -241,7 +293,7 @@ class _ChartContent extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              '$_totalThisWeek total item activity this week',
+              '$_totalThisWeek total activity this week • $_totalStockIn in • $_totalStockOut out',
               style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
@@ -251,6 +303,35 @@ class _ChartContent extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _LegendItem extends StatelessWidget {
+  final Color color;
+  final String label;
+
+  const _LegendItem({required this.color, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 9,
+          height: 9,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF6B7280),
+          ),
+        ),
+      ],
     );
   }
 }

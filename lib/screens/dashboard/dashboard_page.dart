@@ -27,10 +27,14 @@ class DashboardPage extends StatelessWidget {
             children: [
               _header(),
               const SizedBox(height: 18),
+
+              // Real-time total items, near expiry, low stock
               _realOverviewCard(),
+
               const SizedBox(height: 18),
               _sectionTitle('Quick Actions'),
               const SizedBox(height: 12),
+
               const Row(
                 children: [
                   Expanded(
@@ -58,11 +62,17 @@ class DashboardPage extends StatelessWidget {
                   ),
                 ],
               ),
+
               const SizedBox(height: 22),
               _sectionTitle('Today Overview'),
               const SizedBox(height: 12),
+
+              // Real-time stock in and stock out today
               const TodayOverviewSection(),
+
               const SizedBox(height: 16),
+
+              // Real-time weekly stock in and stock out chart
               const DashboardChartCard(),
             ],
           ),
