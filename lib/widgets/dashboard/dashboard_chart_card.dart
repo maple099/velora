@@ -1,9 +1,36 @@
 import 'package:flutter/material.dart';
 
+import '../../logic/firestore_service.dart';
+
 class DashboardChartCard extends StatelessWidget {
+  const DashboardChartCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<WeeklyInventoryActivity>>(
+      stream: FirestoreService.instance.getWeeklyActivityStream(),
+      builder: (context, snapshot) {
+        final data = snapshot.data ?? _emptyData();
+        final weeklyData = data.map((item) => item.total).toList();
+
+        return _ChartContent(weeklyData: weeklyData);
+      },
+    );
+  }
+
+  List<WeeklyInventoryActivity> _emptyData() {
+    final days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+    return List.generate(7, (index) {
+      return WeeklyInventoryActivity(day: days[index], stockIn: 0, stockOut: 0);
+    });
+  }
+}
+
+class _ChartContent extends StatelessWidget {
   final List<int> weeklyData;
 
-  const DashboardChartCard({super.key, required this.weeklyData});
+  const _ChartContent({required this.weeklyData});
 
   int get _maxValue {
     if (weeklyData.isEmpty) return 1;

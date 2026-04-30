@@ -3,6 +3,20 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/inventory_item.dart';
 import '../models/inventory_record.dart';
 
+class WeeklyInventoryActivity {
+  final String day;
+  final int stockIn;
+  final int stockOut;
+
+  WeeklyInventoryActivity({
+    required this.day,
+    required this.stockIn,
+    required this.stockOut,
+  });
+
+  int get total => stockIn + stockOut;
+}
+
 class FirestoreService {
   FirestoreService._();
 
@@ -41,6 +55,31 @@ class FirestoreService {
     );
   }
 
+  Future<void> updateItem(InventoryItem item, [InventoryItem? newItem]) async {
+    if (newItem == null) {
+      await _inventoryRef.doc(item.id).update(item.toMap());
+      return;
+    }
+
+    await _inventoryRef.doc(item.id).update(newItem.toMap());
+
+    if (newItem.quantity > item.quantity) {
+      await _addRecord(
+        itemName: newItem.name,
+        type: 'stock_in',
+        quantity: newItem.quantity - item.quantity,
+      );
+    }
+
+    if (newItem.quantity < item.quantity) {
+      await _addRecord(
+        itemName: newItem.name,
+        type: 'stock_out',
+        quantity: item.quantity - newItem.quantity,
+      );
+    }
+  }
+
   Future<void> markStockOut({
     required InventoryItem item,
     required int usedQuantity,
@@ -64,8 +103,72 @@ class FirestoreService {
     await _inventoryRef.doc(id).delete();
   }
 
-  Future<void> updateItem(InventoryItem item) async {
-    await _inventoryRef.doc(item.id).update(item.toMap());
+  Stream<Map<String, int>> getTodayOverviewStream() {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final end = start.add(const Duration(days: 1));
+
+    return _recordsRef
+        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('createdAt', isLessThan: Timestamp.fromDate(end))
+        .snapshots()
+        .map((snapshot) {
+          int stockIn = 0;
+          int stockOut = 0;
+
+          for (final doc in snapshot.docs) {
+            final data = doc.data();
+            final type = data['type'] ?? '';
+            final quantity = (data['quantity'] ?? 0) as num;
+
+            if (type == 'stock_in') stockIn += quantity.toInt();
+            if (type == 'stock_out') stockOut += quantity.toInt();
+          }
+
+          return {'stock_in': stockIn, 'stock_out': stockOut};
+        });
+  }
+
+  Stream<List<WeeklyInventoryActivity>> getWeeklyActivityStream() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final weekStart = today.subtract(Duration(days: now.weekday - 1));
+    final weekEnd = weekStart.add(const Duration(days: 7));
+
+    return _recordsRef
+        .where(
+          'createdAt',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(weekStart),
+        )
+        .where('createdAt', isLessThan: Timestamp.fromDate(weekEnd))
+        .snapshots()
+        .map((snapshot) {
+          final days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+          final stockInList = List<int>.filled(7, 0);
+          final stockOutList = List<int>.filled(7, 0);
+
+          for (final doc in snapshot.docs) {
+            final data = doc.data();
+            final type = data['type'] ?? '';
+            final quantity = (data['quantity'] ?? 0) as num;
+            final createdAt = data['createdAt'];
+
+            if (createdAt is! Timestamp) continue;
+
+            final index = createdAt.toDate().weekday - 1;
+
+            if (type == 'stock_in') stockInList[index] += quantity.toInt();
+            if (type == 'stock_out') stockOutList[index] += quantity.toInt();
+          }
+
+          return List.generate(7, (index) {
+            return WeeklyInventoryActivity(
+              day: days[index],
+              stockIn: stockInList[index],
+              stockOut: stockOutList[index],
+            );
+          });
+        });
   }
 
   Future<void> _addRecord({
@@ -73,6 +176,8 @@ class FirestoreService {
     required String type,
     required int quantity,
   }) async {
+    if (quantity <= 0) return;
+
     final record = InventoryRecord(
       id: '',
       itemName: itemName,

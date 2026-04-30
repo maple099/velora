@@ -15,20 +15,20 @@ class DashboardOverviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 210,
+      height: 174,
       width: double.infinity,
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(18),
         gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
           colors: [Color(0xFF7C3AED), Color(0xFF4C1D95)],
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF7C3AED).withValues(alpha: 0.28),
-            blurRadius: 28,
+            color: const Color(0xFF7C3AED).withValues(alpha: 0.24),
+            blurRadius: 24,
             offset: const Offset(0, 14),
           ),
         ],
@@ -36,40 +36,38 @@ class DashboardOverviewCard extends StatelessWidget {
       child: Stack(
         children: [
           Positioned(
-            right: -8,
+            right: -4,
             top: 10,
             child: Container(
-              width: 105,
-              height: 105,
+              width: 92,
+              height: 88,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.12),
+                color: Colors.white.withValues(alpha: 0.13),
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(70),
                   bottomLeft: Radius.circular(70),
-                  bottomRight: Radius.circular(14),
+                  bottomRight: Radius.circular(8),
                 ),
               ),
             ),
           ),
-
           Positioned(
-            right: 4,
-            bottom: 6,
+            right: 2,
+            bottom: 12,
             child: Image.asset(
               'assets/images/ai_robot.png',
-              width: 95,
-              height: 95,
+              width: 84,
+              height: 84,
               fit: BoxFit.contain,
               errorBuilder: (_, __, ___) {
                 return const Icon(
                   Icons.smart_toy_rounded,
                   color: Colors.white,
-                  size: 80,
+                  size: 66,
                 );
               },
             ),
           ),
-
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -77,20 +75,20 @@ class DashboardOverviewCard extends StatelessWidget {
                 'Overview',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 22,
+                  fontSize: 19,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               const Text(
                 'Total Overview',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-              const Spacer(),
+              const SizedBox(height: 18),
               Row(
                 children: [
                   _stat(totalItems.toString(), 'Total Items'),
@@ -98,24 +96,24 @@ class DashboardOverviewCard extends StatelessWidget {
                   _stat(nearExpiry.toString(), 'Near Expiry'),
                   _line(),
                   _stat(lowStock.toString(), 'Low Stock'),
-                  const SizedBox(width: 95),
                 ],
               ),
-              const SizedBox(height: 18),
+              const Spacer(),
               const Row(
                 children: [
                   Text(
                     'View All',
                     style: TextStyle(
                       color: Colors.white,
+                      fontSize: 13,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  SizedBox(width: 6),
+                  SizedBox(width: 5),
                   Icon(
                     Icons.arrow_forward_ios_rounded,
                     color: Colors.white,
-                    size: 13,
+                    size: 12,
                   ),
                 ],
               ),
@@ -128,7 +126,7 @@ class DashboardOverviewCard extends StatelessWidget {
 
   Widget _stat(String value, String label) {
     return SizedBox(
-      width: 74,
+      width: 58,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -136,17 +134,19 @@ class DashboardOverviewCard extends StatelessWidget {
             value,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 24,
+              fontSize: 22,
               fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 4),
           Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: Colors.white,
               fontSize: 10,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -157,8 +157,8 @@ class DashboardOverviewCard extends StatelessWidget {
   Widget _line() {
     return Container(
       width: 1,
-      height: 34,
-      margin: const EdgeInsets.symmetric(horizontal: 8),
+      height: 32,
+      margin: const EdgeInsets.symmetric(horizontal: 7),
       color: Colors.white.withValues(alpha: 0.28),
     );
   }
