@@ -1,11 +1,33 @@
 import 'package:flutter/material.dart';
 
+import '../../logic/firestore_service.dart';
 import '../../models/inventory_item.dart';
 
 class ItemDetailsPage extends StatelessWidget {
   final InventoryItem item;
 
   const ItemDetailsPage({super.key, required this.item});
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  IconData _iconForCategory(String category) {
+    switch (category.toLowerCase()) {
+      case 'meat':
+        return Icons.restaurant_rounded;
+      case 'dairy':
+        return Icons.local_drink_rounded;
+      case 'vegetable':
+        return Icons.eco_rounded;
+      case 'fruit':
+        return Icons.apple_rounded;
+      case 'bakery':
+        return Icons.bakery_dining_rounded;
+      default:
+        return Icons.inventory_2_rounded;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +49,7 @@ class ItemDetailsPage extends StatelessWidget {
               const Spacer(),
               _editButton(),
               const SizedBox(height: 10),
-              _deleteButton(),
+              _deleteButton(context),
             ],
           ),
         ),
@@ -77,8 +99,10 @@ class ItemDetailsPage extends StatelessWidget {
             ),
           ],
         ),
-        child: Center(
-          child: Text(item.imageEmoji, style: const TextStyle(fontSize: 62)),
+        child: Icon(
+          _iconForCategory(item.category),
+          size: 62,
+          color: const Color(0xFF7C3AED),
         ),
       ),
     );
@@ -121,11 +145,11 @@ class ItemDetailsPage extends StatelessWidget {
       ),
       child: Column(
         children: [
-          _detailRow('Quantity', '${item.quantity} ${item.unit}'),
+          _detailRow('Quantity', item.quantity.toString()),
           _divider(),
-          _detailRow('Expiry Date', item.expiryDate),
+          _detailRow('Expiry Date', _formatDate(item.expiryDate)),
           _divider(),
-          _detailRow('Purchase Price', 'RM ${item.price}'),
+          _detailRow('Created At', _formatDate(item.createdAt)),
         ],
       ),
     );
@@ -174,11 +198,17 @@ class ItemDetailsPage extends StatelessWidget {
     );
   }
 
-  Widget _deleteButton() {
+  Widget _deleteButton(BuildContext context) {
     return _actionButton(
       text: 'Delete Item',
       colors: const [Color(0xFFEF4444), Color(0xFFF87171)],
-      onTap: () {},
+      onTap: () async {
+        await FirestoreService.instance.deleteItem(item.id);
+
+        if (!context.mounted) return;
+
+        Navigator.pop(context);
+      },
     );
   }
 

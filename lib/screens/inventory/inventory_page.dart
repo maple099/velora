@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../logic/firestore_service.dart';
 import '../../models/inventory_item.dart';
-import '../../services/local_inventory_service.dart';
 import 'item_details_page.dart';
 
 class InventoryPage extends StatefulWidget {
@@ -26,62 +26,125 @@ class _InventoryPageState extends State<InventoryPage> {
 
     return items.where((item) {
       final matchSearch =
-          item.name.toLowerCase().contains(query) ||
-          item.category.toLowerCase().contains(query);
+          _matchesPrefix(item.name, query) ||
+          _matchesPrefix(item.category, query);
 
       if (selectedFilter == 'All Items') return matchSearch;
+
       if (selectedFilter == 'Low Stock') {
-        final quantity = double.tryParse(item.quantity) ?? 0;
-        return matchSearch && quantity <= 2;
+        return matchSearch && item.quantity <= 2;
+      }
+
+      if (selectedFilter == 'Near Expiry') {
+        final daysLeft = item.expiryDate.difference(DateTime.now()).inDays;
+        return matchSearch && daysLeft <= 3 && daysLeft >= 0;
       }
 
       return matchSearch;
     }).toList();
   }
 
+  bool _matchesPrefix(String text, String query) {
+    if (query.isEmpty) return true;
+
+    final normalized = text.toLowerCase().trim();
+
+    if (normalized.startsWith(query)) return true;
+
+    final words = normalized.split(RegExp(r'\s+'));
+    for (final word in words) {
+      if (word.startsWith(query)) return true;
+    }
+
+    return false;
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  IconData _iconForCategory(String category) {
+    switch (category.toLowerCase()) {
+      case 'meat':
+        return Icons.restaurant_rounded;
+      case 'dairy':
+        return Icons.local_drink_rounded;
+      case 'vegetable':
+        return Icons.eco_rounded;
+      case 'fruit':
+        return Icons.apple_rounded;
+      case 'bakery':
+        return Icons.bakery_dining_rounded;
+      default:
+        return Icons.inventory_2_rounded;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _header(),
-            const SizedBox(height: 22),
-            _searchBar(),
-            const SizedBox(height: 14),
-            _filters(),
-            const SizedBox(height: 16),
-            ValueListenableBuilder<List<InventoryItem>>(
-              valueListenable: LocalInventoryService.itemsNotifier,
-              builder: (context, items, child) {
-                final filteredItems = _filterItems(items);
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _header(),
+              const SizedBox(height: 22),
+              _searchBar(),
+              const SizedBox(height: 14),
+              _filters(),
+              const SizedBox(height: 16),
 
-                if (filteredItems.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.only(top: 40),
-                    child: Center(
-                      child: Text(
-                        'No items found',
-                        style: TextStyle(
-                          color: Color(0xFF6B7280),
-                          fontWeight: FontWeight.w600,
+              StreamBuilder<List<InventoryItem>>(
+                stream: FirestoreService.instance.getItems(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.only(top: 60),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+
+                  if (snapshot.hasError) {
+                    return const Padding(
+                      padding: EdgeInsets.only(top: 40),
+                      child: Center(child: Text('Something went wrong')),
+                    );
+                  }
+
+                  final items = snapshot.data ?? [];
+                  final filteredItems = _filterItems(items);
+
+                  if (filteredItems.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.only(top: 40),
+                      child: Center(
+                        child: Text(
+                          'No items found',
+                          style: TextStyle(
+                            color: Color(0xFF6B7280),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                }
+                    );
+                  }
 
-                return Column(
-                  children: filteredItems
-                      .map((item) => _InventoryCard(item: item))
-                      .toList(),
-                );
-              },
-            ),
-          ],
+                  return Column(
+                    children: filteredItems.map((item) {
+                      return _InventoryCard(
+                        item: item,
+                        icon: _iconForCategory(item.category),
+                        expiryText: _formatDate(item.expiryDate),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -195,8 +258,14 @@ class _InventoryPageState extends State<InventoryPage> {
 
 class _InventoryCard extends StatelessWidget {
   final InventoryItem item;
+  final IconData icon;
+  final String expiryText;
 
-  const _InventoryCard({required this.item});
+  const _InventoryCard({
+    required this.item,
+    required this.icon,
+    required this.expiryText,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -229,15 +298,10 @@ class _InventoryCard extends StatelessWidget {
               width: 58,
               height: 58,
               decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
+                color: const Color(0xFFF3E8FF),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Center(
-                child: Text(
-                  item.imageEmoji,
-                  style: const TextStyle(fontSize: 32),
-                ),
-              ),
+              child: Icon(icon, size: 30, color: const Color(0xFF7C3AED)),
             ),
             const SizedBox(width: 13),
             Expanded(
@@ -256,7 +320,7 @@ class _InventoryCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    '${item.category} • ${item.quantity}${item.unit}',
+                    '${item.category} • Qty: ${item.quantity}',
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -265,7 +329,7 @@ class _InventoryCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    'Expiry: ${item.expiryDate}',
+                    'Expiry: $expiryText',
                     style: const TextStyle(
                       fontSize: 11,
                       color: Color(0xFF6B7280),

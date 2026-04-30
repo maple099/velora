@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../logic/firestore_service.dart';
 import '../../models/inventory_item.dart';
-import '../../services/local_inventory_service.dart';
 
 class AddItemPage extends StatefulWidget {
   const AddItemPage({super.key});
@@ -18,6 +18,7 @@ class _AddItemPageState extends State<AddItemPage> {
   String selectedCategory = 'Meat';
   String selectedUnit = 'kg';
   DateTime? selectedDate;
+  bool isSaving = false;
 
   final categories = ['Meat', 'Dairy', 'Vegetable', 'Fruit', 'Bakery', 'Other'];
   final units = ['kg', 'g', 'L', 'ml', 'pcs'];
@@ -43,7 +44,7 @@ class _AddItemPageState extends State<AddItemPage> {
     }
   }
 
-  void _saveItem() {
+  Future<void> _saveItem() async {
     if (itemNameController.text.trim().isEmpty ||
         quantityController.text.trim().isEmpty ||
         selectedDate == null) {
@@ -56,37 +57,24 @@ class _AddItemPageState extends State<AddItemPage> {
       return;
     }
 
+    setState(() => isSaving = true);
+
     final newItem = InventoryItem(
+      id: '',
       name: itemNameController.text.trim(),
       category: selectedCategory,
-      quantity: quantityController.text.trim(),
-      unit: selectedUnit,
-      expiryDate: expiryText,
-      price: priceController.text.trim().isEmpty
-          ? '0.00'
-          : priceController.text.trim(),
-      imageEmoji: _emojiForCategory(selectedCategory),
+      quantity: int.tryParse(quantityController.text.trim()) ?? 0,
+      expiryDate: selectedDate!,
+      imageUrl: '',
+      createdAt: DateTime.now(),
     );
 
-    LocalInventoryService.addItem(newItem);
-    Navigator.pop(context);
-  }
+    await FirestoreService.instance.addItem(newItem);
 
-  String _emojiForCategory(String category) {
-    switch (category) {
-      case 'Meat':
-        return '🍗';
-      case 'Dairy':
-        return '🥛';
-      case 'Vegetable':
-        return '🥬';
-      case 'Fruit':
-        return '🍎';
-      case 'Bakery':
-        return '🍞';
-      default:
-        return '📦';
-    }
+    if (!mounted) return;
+
+    setState(() => isSaving = false);
+    Navigator.pop(context);
   }
 
   String get expiryText {
@@ -108,12 +96,15 @@ class _AddItemPageState extends State<AddItemPage> {
               const SizedBox(height: 22),
               _imageUploadBox(),
               const SizedBox(height: 22),
+
               _inputLabel('Item Name'),
               _textField(
                 controller: itemNameController,
                 hint: 'e.g. Chicken Breast',
               ),
+
               const SizedBox(height: 16),
+
               _inputLabel('Category'),
               _dropdown(
                 value: selectedCategory,
@@ -122,7 +113,9 @@ class _AddItemPageState extends State<AddItemPage> {
                   setState(() => selectedCategory = value!);
                 },
               ),
+
               const SizedBox(height: 16),
+
               _inputLabel('Quantity'),
               Row(
                 children: [
@@ -146,17 +139,23 @@ class _AddItemPageState extends State<AddItemPage> {
                   ),
                 ],
               ),
+
               const SizedBox(height: 16),
+
               _inputLabel('Expiry Date'),
               _dateBox(),
+
               const SizedBox(height: 16),
+
               _inputLabel('Purchase Price (RM)'),
               _textField(
                 controller: priceController,
                 hint: '0.00',
                 keyboardType: TextInputType.number,
               ),
+
               const SizedBox(height: 28),
+
               _saveButton(),
             ],
           ),
@@ -350,7 +349,7 @@ class _AddItemPageState extends State<AddItemPage> {
 
   Widget _saveButton() {
     return GestureDetector(
-      onTap: _saveItem,
+      onTap: isSaving ? null : _saveItem,
       child: Container(
         height: 54,
         width: double.infinity,
@@ -367,15 +366,24 @@ class _AddItemPageState extends State<AddItemPage> {
             ),
           ],
         ),
-        child: const Center(
-          child: Text(
-            'Save Item',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+        child: Center(
+          child: isSaving
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2.4,
+                  ),
+                )
+              : const Text(
+                  'Save Item',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
         ),
       ),
     );
