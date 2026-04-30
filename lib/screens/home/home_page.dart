@@ -4,6 +4,7 @@ import '../dashboard/dashboard_page.dart';
 import '../inventory/inventory_page.dart';
 import '../reports/reports_page.dart';
 import '../suggestions/suggestions_page.dart';
+import '../inventory/add_item_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -33,11 +34,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _showAddMessage() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Add Item page coming soon'),
-        behavior: SnackBarBehavior.floating,
-      ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AddItemPage()),
     );
   }
 
@@ -64,7 +63,7 @@ class _BottomBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 82,
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -85,7 +84,7 @@ class _BottomBar extends StatelessWidget {
           ),
           _NavItem(
             icon: Icons.inventory_2_outlined,
-            text: 'Items',
+            text: 'Inventory',
             active: currentIndex == 1,
             onTap: () => onTap(1),
           ),
@@ -138,7 +137,7 @@ class _NavItem extends StatelessWidget {
             Text(
               text,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: active ? FontWeight.bold : FontWeight.w500,
                 color: active ? activeColor : inactiveColor,
               ),

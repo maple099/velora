@@ -1,15 +1,288 @@
 import 'package:flutter/material.dart';
 
-class InventoryPage extends StatelessWidget {
+class InventoryPage extends StatefulWidget {
   const InventoryPage({super.key});
 
   @override
+  State<InventoryPage> createState() => _InventoryPageState();
+}
+
+class _InventoryPageState extends State<InventoryPage> {
+  String selectedFilter = 'All Items';
+
+  final List<_InventoryItem> items = const [
+    _InventoryItem(
+      name: 'Chicken Breast',
+      category: 'Meat',
+      amount: '2.5kg',
+      expiry: '24 Aug 2026',
+      image: '🍗',
+      alert: 'Low Stock',
+    ),
+    _InventoryItem(
+      name: 'Fresh Milk',
+      category: 'Dairy',
+      amount: '1L',
+      expiry: '25 Apr 2026',
+      image: '🥛',
+    ),
+    _InventoryItem(
+      name: 'Whipping Cream',
+      category: 'Dairy',
+      amount: '1L',
+      expiry: '26 Apr 2026',
+      image: '🍶',
+    ),
+    _InventoryItem(
+      name: 'Garlic',
+      category: 'Vegetable',
+      amount: '2.5kg',
+      expiry: '10 May 2026',
+      image: '🧄',
+    ),
+    _InventoryItem(
+      name: 'Tomato',
+      category: 'Vegetable',
+      amount: '2kg',
+      expiry: '19 May 2026',
+      image: '🍅',
+    ),
+  ];
+
+  @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Inventory Page',
-        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _header(),
+            const SizedBox(height: 22),
+            _searchBar(),
+            const SizedBox(height: 14),
+            _filters(),
+            const SizedBox(height: 16),
+            ...items.map((item) => _InventoryCard(item: item)),
+          ],
+        ),
       ),
     );
   }
+
+  Widget _header() {
+    return Row(
+      children: [
+        InkWell(
+          onTap: () {},
+          borderRadius: BorderRadius.circular(12),
+          child: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            size: 20,
+            color: Color(0xFF111827),
+          ),
+        ),
+        const SizedBox(width: 18),
+        const Text(
+          'Inventory',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF111827),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _searchBar() {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.search_rounded, size: 21, color: Color(0xFF6B7280)),
+                SizedBox(width: 10),
+                Text(
+                  'Search items...',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF9CA3AF),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Icon(Icons.tune_rounded, color: Color(0xFF374151)),
+        ),
+      ],
+    );
+  }
+
+  Widget _filters() {
+    final filters = ['All Items', 'Low Stock', 'Near Expiry'];
+
+    return Row(
+      children: filters.map((filter) {
+        final isActive = selectedFilter == filter;
+
+        return Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: GestureDetector(
+            onTap: () => setState(() => selectedFilter = filter),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+              decoration: BoxDecoration(
+                color: isActive ? const Color(0xFF7C3AED) : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isActive
+                      ? const Color(0xFF7C3AED)
+                      : const Color(0xFFE5E7EB),
+                ),
+              ),
+              child: Text(
+                filter,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: isActive ? Colors.white : const Color(0xFF6B7280),
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _InventoryCard extends StatelessWidget {
+  final _InventoryItem item;
+
+  const _InventoryCard({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 92,
+      margin: const EdgeInsets.only(bottom: 13),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Center(
+              child: Text(item.image, style: const TextStyle(fontSize: 32)),
+            ),
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF111827),
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  '${item.category} • ${item.amount}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF374151),
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Expiry: ${item.expiry}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
+                    ),
+                    if (item.alert != null)
+                      Text(
+                        item.alert!,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFEF4444),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Icon(Icons.chevron_right_rounded, color: Color(0xFF6B7280)),
+        ],
+      ),
+    );
+  }
+}
+
+class _InventoryItem {
+  final String name;
+  final String category;
+  final String amount;
+  final String expiry;
+  final String image;
+  final String? alert;
+
+  const _InventoryItem({
+    required this.name,
+    required this.category,
+    required this.amount,
+    required this.expiry,
+    required this.image,
+    this.alert,
+  });
 }
