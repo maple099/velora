@@ -34,15 +34,30 @@ class FirestoreService {
   Future<void> addItem(InventoryItem item) async {
     await _inventoryRef.add(item.toMap());
 
-    final record = InventoryRecord(
-      id: '',
+    await _addRecord(
       itemName: item.name,
       type: 'stock_in',
       quantity: item.quantity,
-      createdAt: DateTime.now(),
     );
+  }
 
-    await _recordsRef.add(record.toMap());
+  Future<void> markStockOut({
+    required InventoryItem item,
+    required int usedQuantity,
+  }) async {
+    final newQuantity = item.quantity - usedQuantity;
+
+    if (newQuantity < 0) {
+      throw Exception('Used quantity cannot exceed current stock');
+    }
+
+    await _inventoryRef.doc(item.id).update({'quantity': newQuantity});
+
+    await _addRecord(
+      itemName: item.name,
+      type: 'stock_out',
+      quantity: usedQuantity,
+    );
   }
 
   Future<void> deleteItem(String id) async {
@@ -51,5 +66,21 @@ class FirestoreService {
 
   Future<void> updateItem(InventoryItem item) async {
     await _inventoryRef.doc(item.id).update(item.toMap());
+  }
+
+  Future<void> _addRecord({
+    required String itemName,
+    required String type,
+    required int quantity,
+  }) async {
+    final record = InventoryRecord(
+      id: '',
+      itemName: itemName,
+      type: type,
+      quantity: quantity,
+      createdAt: DateTime.now(),
+    );
+
+    await _recordsRef.add(record.toMap());
   }
 }

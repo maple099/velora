@@ -29,6 +29,66 @@ class ItemDetailsPage extends StatelessWidget {
     }
   }
 
+  Future<void> _showStockOutDialog(BuildContext context) async {
+    final controller = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Mark as Used'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: 'Quantity used',
+              hintText: 'Current stock: ${item.quantity}',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final qty = int.tryParse(controller.text.trim()) ?? 0;
+
+                if (qty <= 0 || qty > item.quantity) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Invalid quantity')),
+                  );
+                  return;
+                }
+
+                await FirestoreService.instance.markStockOut(
+                  item: item,
+                  usedQuantity: qty,
+                );
+
+                if (!context.mounted) return;
+
+                Navigator.pop(dialogContext);
+                Navigator.pop(context);
+              },
+              child: const Text('Confirm'),
+            ),
+          ],
+        );
+      },
+    );
+
+    controller.dispose();
+  }
+
+  Future<void> _deleteItem(BuildContext context) async {
+    await FirestoreService.instance.deleteItem(item.id);
+
+    if (!context.mounted) return;
+
+    Navigator.pop(context);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -47,7 +107,7 @@ class ItemDetailsPage extends StatelessWidget {
               const SizedBox(height: 20),
               _detailsCard(),
               const Spacer(),
-              _editButton(),
+              _markUsedButton(context),
               const SizedBox(height: 10),
               _deleteButton(context),
             ],
@@ -190,11 +250,11 @@ class ItemDetailsPage extends StatelessWidget {
     );
   }
 
-  Widget _editButton() {
+  Widget _markUsedButton(BuildContext context) {
     return _actionButton(
-      text: 'Edit Item',
-      colors: const [Color(0xFF7C3AED), Color(0xFFA855F7)],
-      onTap: () {},
+      text: 'Mark as Used',
+      colors: const [Color(0xFF10B981), Color(0xFF34D399)],
+      onTap: () => _showStockOutDialog(context),
     );
   }
 
@@ -202,13 +262,7 @@ class ItemDetailsPage extends StatelessWidget {
     return _actionButton(
       text: 'Delete Item',
       colors: const [Color(0xFFEF4444), Color(0xFFF87171)],
-      onTap: () async {
-        await FirestoreService.instance.deleteItem(item.id);
-
-        if (!context.mounted) return;
-
-        Navigator.pop(context);
-      },
+      onTap: () => _deleteItem(context),
     );
   }
 

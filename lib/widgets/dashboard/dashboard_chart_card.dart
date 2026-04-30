@@ -21,14 +21,14 @@ class DashboardChartCard extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),
@@ -36,32 +36,40 @@ class DashboardChartCard extends StatelessWidget {
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _header(),
-          const SizedBox(height: 14),
-
+          const SizedBox(height: 16),
           SizedBox(
-            height: 105,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: List.generate(7, (index) {
-                final value = weeklyData.length > index ? weeklyData[index] : 0;
-                final heightFactor = value / _maxValue;
+            height: 138,
+            child: Stack(
+              children: [
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 34,
+                  child: Container(height: 1, color: const Color(0xFFE5E7EB)),
+                ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: List.generate(7, (index) {
+                    final value = weeklyData.length > index
+                        ? weeklyData[index]
+                        : 0;
 
-                return Expanded(
-                  child: _bar(
-                    value: value,
-                    day: days[index],
-                    active: index == DateTime.now().weekday - 1,
-                    heightFactor: heightFactor,
-                  ),
-                );
-              }),
+                    return Expanded(
+                      child: _bar(
+                        value: value,
+                        day: days[index],
+                        active: index == DateTime.now().weekday - 1,
+                        heightFactor: value / _maxValue,
+                      ),
+                    );
+                  }),
+                ),
+              ],
             ),
           ),
-
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           _weeklyInsight(),
         ],
       ),
@@ -72,28 +80,48 @@ class DashboardChartCard extends StatelessWidget {
     return Row(
       children: [
         const Expanded(
-          child: Text(
-            'Inventory Activity',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-              color: Color(0xFF111827),
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Inventory Activity',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF111827),
+                ),
+              ),
+              SizedBox(height: 5),
+              Text(
+                'Track your inventory changes this week',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF6B7280),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
         ),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
           decoration: BoxDecoration(
             color: const Color(0xFFF3E8FF),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
           ),
-          child: const Text(
-            'Live Weekly',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF7C3AED),
-            ),
+          child: const Row(
+            children: [
+              Icon(Icons.circle, size: 8, color: Color(0xFF7C3AED)),
+              SizedBox(width: 7),
+              Text(
+                'Live Weekly',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF7C3AED),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -106,7 +134,7 @@ class DashboardChartCard extends StatelessWidget {
     required bool active,
     required double heightFactor,
   }) {
-    final barHeight = value == 0 ? 8.0 : 70 * heightFactor;
+    final barHeight = value == 0 ? 9.0 : 78 * heightFactor;
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
@@ -114,35 +142,45 @@ class DashboardChartCard extends StatelessWidget {
         Text(
           value.toString(),
           style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w800,
+            fontSize: active ? 13 : 11,
+            fontWeight: FontWeight.w900,
             color: active ? const Color(0xFF7C3AED) : const Color(0xFF6B7280),
           ),
         ),
-        const SizedBox(height: 5),
+        const SizedBox(height: 6),
         AnimatedContainer(
           duration: const Duration(milliseconds: 350),
-          width: 18,
+          width: 26,
           height: barHeight,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
             gradient: active
                 ? const LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Color(0xFFA855F7), Color(0xFF7C3AED)],
+                    colors: [Color(0xFF7C3AED), Color(0xFFA855F7)],
                   )
                 : null,
             color: active ? null : const Color(0xFFEDE9FE),
           ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          day,
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w800,
-            color: active ? const Color(0xFF7C3AED) : const Color(0xFF6B7280),
+        const SizedBox(height: 8),
+        Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: active ? 12 : 0,
+            vertical: active ? 4 : 0,
+          ),
+          decoration: BoxDecoration(
+            color: active ? const Color(0xFFF3E8FF) : Colors.transparent,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Text(
+            day,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              color: active ? const Color(0xFF7C3AED) : const Color(0xFF6B7280),
+            ),
           ),
         ),
       ],
@@ -152,26 +190,34 @@ class DashboardChartCard extends StatelessWidget {
   Widget _weeklyInsight() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE9D5FF)),
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.auto_graph_rounded,
-            size: 18,
-            color: Color(0xFF7C3AED),
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3E8FF),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.auto_graph_rounded,
+              color: Color(0xFF7C3AED),
+              size: 22,
+            ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               '$_totalThisWeek total item activity this week',
               style: const TextStyle(
                 fontSize: 12,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w800,
                 color: Color(0xFF6B7280),
               ),
             ),
