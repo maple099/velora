@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/inventory_item.dart';
 import '../../services/local_inventory_service.dart';
+import 'item_details_page.dart';
 
 class InventoryPage extends StatefulWidget {
   const InventoryPage({super.key});
@@ -12,6 +13,31 @@ class InventoryPage extends StatefulWidget {
 
 class _InventoryPageState extends State<InventoryPage> {
   String selectedFilter = 'All Items';
+  final TextEditingController searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  List<InventoryItem> _filterItems(List<InventoryItem> items) {
+    final query = searchController.text.toLowerCase().trim();
+
+    return items.where((item) {
+      final matchSearch =
+          item.name.toLowerCase().contains(query) ||
+          item.category.toLowerCase().contains(query);
+
+      if (selectedFilter == 'All Items') return matchSearch;
+      if (selectedFilter == 'Low Stock') {
+        final quantity = double.tryParse(item.quantity) ?? 0;
+        return matchSearch && quantity <= 2;
+      }
+
+      return matchSearch;
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,8 +57,25 @@ class _InventoryPageState extends State<InventoryPage> {
             ValueListenableBuilder<List<InventoryItem>>(
               valueListenable: LocalInventoryService.itemsNotifier,
               builder: (context, items, child) {
+                final filteredItems = _filterItems(items);
+
+                if (filteredItems.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.only(top: 40),
+                    child: Center(
+                      child: Text(
+                        'No items found',
+                        style: TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
                 return Column(
-                  children: items
+                  children: filteredItems
                       .map((item) => _InventoryCard(item: item))
                       .toList(),
                 );
@@ -76,16 +119,22 @@ class _InventoryPageState extends State<InventoryPage> {
               color: const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.search_rounded, size: 21, color: Color(0xFF6B7280)),
-                SizedBox(width: 10),
-                Text(
-                  'Search items...',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF9CA3AF),
+                const Icon(
+                  Icons.search_rounded,
+                  size: 21,
+                  color: Color(0xFF6B7280),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: searchController,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      hintText: 'Search items...',
+                      border: InputBorder.none,
+                    ),
                   ),
                 ),
               ],
@@ -151,75 +200,83 @@ class _InventoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 92,
-      margin: const EdgeInsets.only(bottom: 13),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 14,
-            offset: const Offset(0, 7),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(16),
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ItemDetailsPage(item: item)),
+        );
+      },
+      child: Container(
+        height: 92,
+        margin: const EdgeInsets.only(bottom: 13),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 14,
+              offset: const Offset(0, 7),
             ),
-            child: Center(
-              child: Text(
-                item.imageEmoji,
-                style: const TextStyle(fontSize: 32),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Center(
+                child: Text(
+                  item.imageEmoji,
+                  style: const TextStyle(fontSize: 32),
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 13),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF111827),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF111827),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  '${item.category} • ${item.quantity}${item.unit}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF374151),
+                  const SizedBox(height: 5),
+                  Text(
+                    '${item.category} • ${item.quantity}${item.unit}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF374151),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  'Expiry: ${item.expiryDate}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF6B7280),
+                  const SizedBox(height: 5),
+                  Text(
+                    'Expiry: ${item.expiryDate}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF6B7280),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const Icon(Icons.chevron_right_rounded, color: Color(0xFF6B7280)),
-        ],
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF6B7280)),
+          ],
+        ),
       ),
     );
   }
