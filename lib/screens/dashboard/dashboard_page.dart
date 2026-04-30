@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../logic/firestore_service.dart';
 import '../../widgets/dashboard/dashboard_chart_card.dart';
 import '../../widgets/dashboard/dashboard_overview_card.dart';
 import '../../widgets/dashboard/dashboard_quick_action_card.dart';
@@ -26,17 +27,10 @@ class DashboardPage extends StatelessWidget {
             children: [
               _header(),
               const SizedBox(height: 18),
-
-              const DashboardOverviewCard(
-                totalItems: 3,
-                nearExpiry: 2,
-                lowStock: 0,
-              ),
-
+              _realOverviewCard(),
               const SizedBox(height: 18),
               _sectionTitle('Quick Actions'),
               const SizedBox(height: 12),
-
               const Row(
                 children: [
                   Expanded(
@@ -64,19 +58,32 @@ class DashboardPage extends StatelessWidget {
                   ),
                 ],
               ),
-
               const SizedBox(height: 22),
               _sectionTitle('Today Overview'),
               const SizedBox(height: 12),
-
               const TodayOverviewSection(),
               const SizedBox(height: 16),
-
               const DashboardChartCard(),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _realOverviewCard() {
+    return StreamBuilder<Map<String, int>>(
+      stream: FirestoreService.instance.getOverviewStream(),
+      builder: (context, snapshot) {
+        final data =
+            snapshot.data ?? {'total': 0, 'nearExpiry': 0, 'lowStock': 0};
+
+        return DashboardOverviewCard(
+          totalItems: data['total'] ?? 0,
+          nearExpiry: data['nearExpiry'] ?? 0,
+          lowStock: data['lowStock'] ?? 0,
+        );
+      },
     );
   }
 

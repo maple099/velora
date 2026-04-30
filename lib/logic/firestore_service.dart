@@ -45,6 +45,124 @@ class FirestoreService {
     });
   }
 
+  Stream<Map<String, int>> getOverviewStream() {
+    return _inventoryRef.snapshots().map((snapshot) {
+      int totalItems = snapshot.docs.length;
+      int nearExpiry = 0;
+      int lowStock = 0;
+
+      final today = DateTime.now();
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+
+        final quantity = (data['quantity'] ?? 0) as num;
+        final expiryValue = data['expiryDate'];
+
+        if (quantity.toInt() <= 5) {
+          lowStock++;
+        }
+
+        if (expiryValue is Timestamp) {
+          final expiryDate = expiryValue.toDate();
+          final difference = expiryDate.difference(today).inDays;
+
+          if (difference >= 0 && difference <= 3) {
+            nearExpiry++;
+          }
+        }
+      }
+
+      return {
+        'total': totalItems,
+        'nearExpiry': nearExpiry,
+        'lowStock': lowStock,
+      };
+    });
+  }
+
+  Stream<Map<String, int>> getTodayOverviewStream() {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final end = start.add(const Duration(days: 1));
+
+    return _recordsRef
+        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('createdAt', isLessThan: Timestamp.fromDate(end))
+        .snapshots()
+        .map((snapshot) {
+          int stockIn = 0;
+          int stockOut = 0;
+
+          for (final doc in snapshot.docs) {
+            final data = doc.data();
+
+            final type = data['type'] ?? '';
+            final quantity = (data['quantity'] ?? 0) as num;
+
+            if (type == 'stock_in') {
+              stockIn += quantity.toInt();
+            }
+
+            if (type == 'stock_out') {
+              stockOut += quantity.toInt();
+            }
+          }
+
+          return {'stock_in': stockIn, 'stock_out': stockOut};
+        });
+  }
+
+  Stream<List<WeeklyInventoryActivity>> getWeeklyActivityStream() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final weekStart = today.subtract(Duration(days: now.weekday - 1));
+    final weekEnd = weekStart.add(const Duration(days: 7));
+
+    return _recordsRef
+        .where(
+          'createdAt',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(weekStart),
+        )
+        .where('createdAt', isLessThan: Timestamp.fromDate(weekEnd))
+        .snapshots()
+        .map((snapshot) {
+          final days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+          final stockInList = List<int>.filled(7, 0);
+          final stockOutList = List<int>.filled(7, 0);
+
+          for (final doc in snapshot.docs) {
+            final data = doc.data();
+
+            final type = data['type'] ?? '';
+            final quantity = (data['quantity'] ?? 0) as num;
+            final createdAt = data['createdAt'];
+
+            if (createdAt is! Timestamp) continue;
+
+            final index = createdAt.toDate().weekday - 1;
+
+            if (index < 0 || index > 6) continue;
+
+            if (type == 'stock_in') {
+              stockInList[index] += quantity.toInt();
+            }
+
+            if (type == 'stock_out') {
+              stockOutList[index] += quantity.toInt();
+            }
+          }
+
+          return List.generate(7, (index) {
+            return WeeklyInventoryActivity(
+              day: days[index],
+              stockIn: stockInList[index],
+              stockOut: stockOutList[index],
+            );
+          });
+        });
+  }
+
   Future<void> addItem(InventoryItem item) async {
     await _inventoryRef.add(item.toMap());
 
@@ -101,74 +219,6 @@ class FirestoreService {
 
   Future<void> deleteItem(String id) async {
     await _inventoryRef.doc(id).delete();
-  }
-
-  Stream<Map<String, int>> getTodayOverviewStream() {
-    final now = DateTime.now();
-    final start = DateTime(now.year, now.month, now.day);
-    final end = start.add(const Duration(days: 1));
-
-    return _recordsRef
-        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
-        .where('createdAt', isLessThan: Timestamp.fromDate(end))
-        .snapshots()
-        .map((snapshot) {
-          int stockIn = 0;
-          int stockOut = 0;
-
-          for (final doc in snapshot.docs) {
-            final data = doc.data();
-            final type = data['type'] ?? '';
-            final quantity = (data['quantity'] ?? 0) as num;
-
-            if (type == 'stock_in') stockIn += quantity.toInt();
-            if (type == 'stock_out') stockOut += quantity.toInt();
-          }
-
-          return {'stock_in': stockIn, 'stock_out': stockOut};
-        });
-  }
-
-  Stream<List<WeeklyInventoryActivity>> getWeeklyActivityStream() {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final weekStart = today.subtract(Duration(days: now.weekday - 1));
-    final weekEnd = weekStart.add(const Duration(days: 7));
-
-    return _recordsRef
-        .where(
-          'createdAt',
-          isGreaterThanOrEqualTo: Timestamp.fromDate(weekStart),
-        )
-        .where('createdAt', isLessThan: Timestamp.fromDate(weekEnd))
-        .snapshots()
-        .map((snapshot) {
-          final days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-          final stockInList = List<int>.filled(7, 0);
-          final stockOutList = List<int>.filled(7, 0);
-
-          for (final doc in snapshot.docs) {
-            final data = doc.data();
-            final type = data['type'] ?? '';
-            final quantity = (data['quantity'] ?? 0) as num;
-            final createdAt = data['createdAt'];
-
-            if (createdAt is! Timestamp) continue;
-
-            final index = createdAt.toDate().weekday - 1;
-
-            if (type == 'stock_in') stockInList[index] += quantity.toInt();
-            if (type == 'stock_out') stockOutList[index] += quantity.toInt();
-          }
-
-          return List.generate(7, (index) {
-            return WeeklyInventoryActivity(
-              day: days[index],
-              stockIn: stockInList[index],
-              stockOut: stockOutList[index],
-            );
-          });
-        });
   }
 
   Future<void> _addRecord({
