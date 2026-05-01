@@ -38,14 +38,14 @@ class AlertsPage extends StatelessWidget {
             final quantity = (data['quantity'] ?? 0) as num;
             final expiry = data['expiryDate'];
 
-            bool isLowStock = quantity.toInt() <= 5;
+            final isLowStock = quantity.toInt() <= 5;
             bool isNearExpiry = false;
 
             if (expiry is Timestamp) {
               final expiryDate = expiry.toDate();
               final diff = expiryDate.difference(now).inDays;
 
-              isNearExpiry = diff >= 0 && diff <= 7;
+              isNearExpiry = diff >= 0 && diff <= 4;
             }
 
             return isLowStock || isNearExpiry;
@@ -74,14 +74,14 @@ class AlertsPage extends StatelessWidget {
               final quantity = (data['quantity'] ?? 0) as num;
               final expiry = data['expiryDate'];
 
-              bool isLowStock = quantity.toInt() <= 5;
+              final isLowStock = quantity.toInt() <= 5;
               bool isNearExpiry = false;
 
               if (expiry is Timestamp) {
                 final expiryDate = expiry.toDate();
                 final diff = expiryDate.difference(now).inDays;
 
-                isNearExpiry = diff >= 0 && diff <= 7;
+                isNearExpiry = diff >= 0 && diff <= 4;
               }
 
               return _alertCard(
@@ -103,6 +103,14 @@ class AlertsPage extends StatelessWidget {
     required bool isLowStock,
     required bool isNearExpiry,
   }) {
+    final alertText = isLowStock && isNearExpiry
+        ? 'Low stock and expiring soon'
+        : isLowStock
+        ? 'Low stock: $quantity left'
+        : 'Expiring soon';
+
+    final alertColor = isLowStock ? red : orange;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
@@ -117,16 +125,14 @@ class AlertsPage extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: isLowStock
-                  ? red.withOpacity(0.1)
-                  : orange.withOpacity(0.1),
+              color: alertColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               isLowStock
                   ? Icons.warning_amber_rounded
                   : Icons.access_time_rounded,
-              color: isLowStock ? red : orange,
+              color: alertColor,
             ),
           ),
           const SizedBox(width: 12),
@@ -144,7 +150,7 @@ class AlertsPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  isLowStock ? 'Low stock: $quantity left' : 'Expiring soon',
+                  alertText,
                   style: const TextStyle(
                     fontSize: 12,
                     color: textGrey,

@@ -32,12 +32,12 @@ class _InventoryPageState extends State<InventoryPage> {
       if (selectedFilter == 'All Items') return matchSearch;
 
       if (selectedFilter == 'Low Stock') {
-        return matchSearch && item.quantity <= 2;
+        return matchSearch && item.quantity <= 5;
       }
 
       if (selectedFilter == 'Near Expiry') {
         final daysLeft = item.expiryDate.difference(DateTime.now()).inDays;
-        return matchSearch && daysLeft <= 3 && daysLeft >= 0;
+        return matchSearch && daysLeft >= 0 && daysLeft <= 4;
       }
 
       return matchSearch;
@@ -96,7 +96,6 @@ class _InventoryPageState extends State<InventoryPage> {
               const SizedBox(height: 14),
               _filters(),
               const SizedBox(height: 16),
-
               StreamBuilder<List<InventoryItem>>(
                 stream: FirestoreService.instance.getItems(),
                 builder: (context, snapshot) {

@@ -1,4 +1,4 @@
-package com.example.velora
+git add .package com.example.velora
 
 import io.flutter.embedding.android.FlutterActivity
 

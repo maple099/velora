@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../logic/firestore_service.dart';
 import '../../models/inventory_item.dart';
+import 'edit_item_page.dart';
 
 class ItemDetailsPage extends StatelessWidget {
   final InventoryItem item;
@@ -81,12 +82,45 @@ class ItemDetailsPage extends StatelessWidget {
     controller.dispose();
   }
 
-  Future<void> _deleteItem(BuildContext context) async {
+  Future<void> _confirmDeleteItem(BuildContext context) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete Item?'),
+          content: Text('Are you sure you want to delete ${item.name}?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete != true) return;
+
     await FirestoreService.instance.deleteItem(item.id);
 
     if (!context.mounted) return;
 
     Navigator.pop(context);
+  }
+
+  void _openEditPage(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => EditItemPage(item: item)),
+    );
   }
 
   @override
@@ -107,6 +141,8 @@ class ItemDetailsPage extends StatelessWidget {
               const SizedBox(height: 20),
               _detailsCard(),
               const Spacer(),
+              _editButton(context),
+              const SizedBox(height: 10),
               _markUsedButton(context),
               const SizedBox(height: 10),
               _deleteButton(context),
@@ -209,7 +245,7 @@ class ItemDetailsPage extends StatelessWidget {
           _divider(),
           _detailRow('Expiry Date', _formatDate(item.expiryDate)),
           _divider(),
-          _detailRow('Created At', _formatDate(item.createdAt)),
+          _detailRow('Stored On', _formatDate(item.createdAt)),
         ],
       ),
     );
@@ -250,6 +286,14 @@ class ItemDetailsPage extends StatelessWidget {
     );
   }
 
+  Widget _editButton(BuildContext context) {
+    return _actionButton(
+      text: 'Edit Item',
+      colors: const [Color(0xFF7C3AED), Color(0xFFA855F7)],
+      onTap: () => _openEditPage(context),
+    );
+  }
+
   Widget _markUsedButton(BuildContext context) {
     return _actionButton(
       text: 'Mark as Used',
@@ -262,7 +306,7 @@ class ItemDetailsPage extends StatelessWidget {
     return _actionButton(
       text: 'Delete Item',
       colors: const [Color(0xFFEF4444), Color(0xFFF87171)],
-      onTap: () => _deleteItem(context),
+      onTap: () => _confirmDeleteItem(context),
     );
   }
 

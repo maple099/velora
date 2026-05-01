@@ -67,7 +67,7 @@ class FirestoreService {
           final expiryDate = expiryValue.toDate();
           final difference = expiryDate.difference(today).inDays;
 
-          if (difference >= 0 && difference <= 3) {
+          if (difference >= 0 && difference <= 4) {
             nearExpiry++;
           }
         }
