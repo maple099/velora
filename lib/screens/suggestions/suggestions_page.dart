@@ -221,7 +221,7 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
                     const EmptyCard(text: 'No near-expiry items found.')
                   else
                     SizedBox(
-                      height: 170, // temporary (we will still improve card)
+                      height: 180,
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
                         itemCount: nearExpiry.length,
