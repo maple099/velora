@@ -1,26 +1,78 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class SuggestionsPage extends StatelessWidget {
+import '../../models/inventory_item.dart';
+import '../../logic/gemini_service.dart';
+
+class SuggestionsPage extends StatefulWidget {
   const SuggestionsPage({super.key});
 
-  static const Color textDark = Color(0xFF111827);
-  static const Color textGrey = Color(0xFF6B7280);
-  static const Color purple = Color(0xFF7C3AED);
+  @override
+  State<SuggestionsPage> createState() => _SuggestionsPageState();
+}
+
+class _SuggestionsPageState extends State<SuggestionsPage> {
+  final GeminiService _gemini = GeminiService();
+
+  bool _isLoading = false;
+  String _resultText = '';
+
+  /// 🔥 CALL GEMINI
+  Future<void> _generateSuggestions(List<InventoryItem> items) async {
+    setState(() {
+      _isLoading = true;
+      _resultText = '';
+    });
+
+    final result = await _gemini.generateRecipeSuggestions(items);
+
+    setState(() {
+      _resultText = result;
+      _isLoading = false;
+    });
+  }
+
+  /// 🔥 FIXED CONVERT FUNCTION (NO ERROR)
+  List<InventoryItem> _convertDocs(List<QueryDocumentSnapshot> docs) {
+    return docs.map((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+
+      return InventoryItem(
+        id: doc.id,
+        name: data['name'] ?? '',
+        category: data['category'] ?? '',
+        quantity: data['quantity'] ?? 0,
+        expiryDate: (data['expiryDate'] as Timestamp).toDate(),
+
+        // ✅ FIX HERE
+        imageUrl: data['imageUrl'] ?? '',
+        createdAt: data['createdAt'] is Timestamp
+            ? (data['createdAt'] as Timestamp).toDate()
+            : DateTime.now(),
+      );
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
+
+      /// APPBAR
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         title: const Text(
           'AI Suggestions',
-          style: TextStyle(color: textDark, fontWeight: FontWeight.w800),
+          style: TextStyle(
+            color: Color(0xFF111827),
+            fontWeight: FontWeight.w800,
+          ),
         ),
-        iconTheme: const IconThemeData(color: textDark),
+        iconTheme: const IconThemeData(color: Color(0xFF111827)),
       ),
+
+      /// BODY
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance.collection('inventory').snapshots(),
         builder: (context, snapshot) {
@@ -28,160 +80,70 @@ class SuggestionsPage extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final docs = snapshot.data!.docs;
-          final now = DateTime.now();
+          final items = _convertDocs(snapshot.data!.docs);
 
-          final nearExpiryItems = docs.where((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            final expiry = data['expiryDate'];
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                /// 🔥 GENERATE BUTTON
+                SizedBox(
+                  width: double.infinity,
+                  height: 55,
+                  child: ElevatedButton(
+                    onPressed: () => _generateSuggestions(items),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF7C3AED),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text(
+                      'Generate Recipe Suggestions',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
 
-            if (expiry is Timestamp) {
-              final diff = expiry.toDate().difference(now).inDays;
-              return diff >= 0 && diff <= 4;
-            }
+                const SizedBox(height: 20),
 
-            return false;
-          }).toList();
+                /// 🔄 LOADING
+                if (_isLoading)
+                  const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: CircularProgressIndicator(),
+                  ),
 
-          final itemNames = nearExpiryItems
-              .map((e) => (e['name'] ?? '').toString().toLowerCase())
-              .toList();
-
-          final suggestions = _generateSuggestions(itemNames);
-
-          if (suggestions.isEmpty) {
-            return const Center(
-              child: Text(
-                'No suggestions yet 🤔',
-                style: TextStyle(color: textGrey, fontWeight: FontWeight.w600),
-              ),
-            );
-          }
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(14),
-            itemCount: suggestions.length,
-            itemBuilder: (context, index) {
-              return _suggestionCard(suggestions[index]);
-            },
+                /// 📦 RESULT CARD
+                if (!_isLoading && _resultText.isNotEmpty)
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFE5E7EB)),
+                        ),
+                        child: Text(
+                          _resultText,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            height: 1.5,
+                            color: Color(0xFF111827),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           );
         },
       ),
     );
   }
-
-  List<RecipeSuggestion> _generateSuggestions(List<String> items) {
-    final List<RecipeSuggestion> results = [];
-
-    if (items.contains('bread') && items.contains('egg')) {
-      results.add(
-        const RecipeSuggestion(
-          title: 'Make Sandwich 🥪',
-          reason: 'Because you have bread and egg expiring soon.',
-        ),
-      );
-
-      results.add(
-        const RecipeSuggestion(
-          title: 'Make French Toast 🍞',
-          reason: 'Because bread and egg can be used before they expire.',
-        ),
-      );
-    }
-
-    if (items.contains('rice') && items.contains('egg')) {
-      results.add(
-        const RecipeSuggestion(
-          title: 'Make Fried Rice 🍚',
-          reason: 'Because rice and egg are available near expiry.',
-        ),
-      );
-    }
-
-    if (items.contains('chicken')) {
-      results.add(
-        const RecipeSuggestion(
-          title: 'Cook Grilled Chicken 🍗',
-          reason: 'Because chicken should be used before expiry.',
-        ),
-      );
-    }
-
-    if (items.contains('milk')) {
-      results.add(
-        const RecipeSuggestion(
-          title: 'Make Pancakes 🥞',
-          reason: 'Because milk can be used for a simple recipe.',
-        ),
-      );
-    }
-
-    if (items.contains('banana')) {
-      results.add(
-        const RecipeSuggestion(
-          title: 'Make Banana Smoothie 🍌',
-          reason: 'Because banana is near expiry and can be blended quickly.',
-        ),
-      );
-    }
-
-    return results;
-  }
-
-  Widget _suggestionCard(RecipeSuggestion suggestion) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF3E8FF),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.lightbulb, color: purple),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  suggestion.title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: textDark,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  suggestion.reason,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: textGrey,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class RecipeSuggestion {
-  final String title;
-  final String reason;
-
-  const RecipeSuggestion({required this.title, required this.reason});
 }
