@@ -5,9 +5,10 @@ import '../../logic/ai_cache_service.dart';
 import '../../logic/cook_now_service.dart';
 import '../../logic/gemini_service.dart';
 import '../../logic/suggestion_helper.dart';
+
 import '../../models/inventory_item.dart';
+
 import '../../widgets/suggestions/cache_notice.dart';
-import '../../widgets/suggestions/cook_now_sheet.dart';
 import '../../widgets/suggestions/empty_card.dart';
 import '../../widgets/suggestions/header_card.dart';
 import '../../widgets/suggestions/premium_loading_card.dart';
@@ -22,15 +23,64 @@ class SuggestionsPage extends StatefulWidget {
 }
 
 class _SuggestionsPageState extends State<SuggestionsPage> {
+  /// 🔥 SERVICES
   final GeminiService _gemini = GeminiService();
   final CookNowService _cookNowService = CookNowService();
   final AiCacheService _cacheService = AiCacheService();
   final SuggestionHelper _helper = SuggestionHelper();
 
+  /// 🔥 STATE
   bool _isLoading = false;
   bool _isCached = false;
   String _resultText = '';
 
+  /// ===============================
+  /// 🔥 GENERATE WITH CACHE
+  /// ===============================
+  Future<void> _generateWithCache({
+    required String type,
+    required List<InventoryItem> items,
+    required Future<String> Function() fetcher,
+  }) async {
+    setState(() {
+      _isLoading = true;
+      _isCached = false;
+      _resultText = '';
+    });
+
+    /// ✅ CHECK CACHE FIRST
+    final cached = await _cacheService.getCachedResult(
+      type: type,
+      items: items,
+    );
+
+    if (cached != null && cached.trim().isNotEmpty) {
+      if (!mounted) return;
+
+      setState(() {
+        _resultText = cached;
+        _isCached = true;
+        _isLoading = false;
+      });
+      return;
+    }
+
+    /// ❌ NOT CACHED → CALL GEMINI
+    final result = await fetcher();
+
+    /// SAVE CACHE
+    await _cacheService.saveResult(type: type, items: items, result: result);
+
+    if (!mounted) return;
+
+    setState(() {
+      _resultText = result;
+      _isCached = false;
+      _isLoading = false;
+    });
+  }
+
+  /// 🔥 ACTIONS
   Future<void> _generateRecipes(List<InventoryItem> items) async {
     await _generateWithCache(
       type: 'recipes',
@@ -47,68 +97,7 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
     );
   }
 
-  Future<void> _generateWithCache({
-    required String type,
-    required List<InventoryItem> items,
-    required Future<String> Function() fetcher,
-  }) async {
-    setState(() {
-      _isLoading = true;
-      _isCached = false;
-      _resultText = '';
-    });
-
-    final cachedResult = await _cacheService.getCachedResult(
-      type: type,
-      items: items,
-    );
-
-    if (cachedResult != null && cachedResult.trim().isNotEmpty) {
-      if (!mounted) return;
-
-      setState(() {
-        _resultText = cachedResult;
-        _isCached = true;
-        _isLoading = false;
-      });
-      return;
-    }
-
-    final result = await fetcher();
-
-    await _cacheService.saveResult(type: type, items: items, result: result);
-
-    if (!mounted) return;
-
-    setState(() {
-      _resultText = result;
-      _isCached = false;
-      _isLoading = false;
-    });
-  }
-
-  Future<void> _showCookNowSheet(
-    Map<String, String> recipe,
-    List<InventoryItem> items,
-  ) async {
-    final matchedItems = _helper.matchedIngredients(recipe, items);
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return CookNowSheet(
-          recipeTitle: recipe['title'] ?? 'Recipe',
-          matchedItems: matchedItems,
-          onConfirm: () async {
-            Navigator.pop(context);
-            await _cookRecipe(matchedItems);
-          },
-        );
-      },
-    );
-  }
-
+  /// 🔥 COOK LOGIC
   Future<void> _cookRecipe(List<InventoryItem> usedItems) async {
     try {
       await _cookNowService.cookRecipe(usedItems);
@@ -126,31 +115,44 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
     );
   }
 
+  /// ===============================
+  /// 🔥 UI BUILDER (AI RESULT)
+  /// ===============================
   Widget _buildAiResult(List<InventoryItem> items) {
-    if (_isLoading) return const PremiumLoadingCard();
+    /// 🔄 LOADING
+    if (_isLoading) {
+      return const PremiumLoadingCard();
+    }
 
+    /// 💤 EMPTY
     if (_resultText.isEmpty) {
       return const EmptyCard(
         text: 'Press Generate Recipes or Restock Advice to get AI suggestions.',
       );
     }
 
+    /// ✅ RESULT
     return Column(
       children: [
         if (_isCached) const CacheNotice(),
+
         ResultCards(
           recipes: _helper.parseRecipes(_resultText),
           inventoryItems: items,
-          onCookNow: (recipe) => _showCookNowSheet(recipe, items),
+          onCookRecipe: _cookRecipe,
         ),
       ],
     );
   }
 
+  /// ===============================
+  /// 🔥 MAIN BUILD
+  /// ===============================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
+
       body: SafeArea(
         child: StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
@@ -161,6 +163,7 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
               return const Center(child: CircularProgressIndicator());
             }
 
+            /// 🔄 CONVERT DATA
             final items = _helper.convertDocs(snapshot.data!.docs);
             final nearExpiry = _helper.nearExpiryItems(items);
 
@@ -169,27 +172,44 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  /// 🟣 TITLE
                   const SuggestionPageTitle(),
+
                   const SizedBox(height: 18),
+
+                  /// 📊 HEADER
                   HeaderCard(
                     totalItems: items.length,
                     nearExpiry: nearExpiry.length,
                   ),
+
                   const SizedBox(height: 18),
+
+                  /// ⚡ ACTION BUTTONS
                   SuggestionActionButtons(
                     onRecipeTap: () => _generateRecipes(items),
                     onRestockTap: () => _generateRestock(items),
                   ),
+
                   const SizedBox(height: 24),
+
+                  /// 🔥 NEAR EXPIRY
                   const SuggestionSectionTitle(title: 'Near Expiry Items'),
+
                   const SizedBox(height: 12),
+
                   NearExpirySection(
                     nearExpiry: nearExpiry,
                     daysLeftText: _helper.daysLeftText,
                   ),
+
                   const SizedBox(height: 24),
+
+                  /// 🤖 AI RESULT
                   const SuggestionSectionTitle(title: 'AI Result'),
+
                   const SizedBox(height: 12),
+
                   _buildAiResult(items),
                 ],
               ),
