@@ -3,14 +3,18 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../../logic/ai_cache_service.dart';
+import '../../logic/ai_generate_service.dart';
+import '../../logic/ai_inventory_checker.dart';
 import '../../logic/ai_quota_service.dart';
+import '../../logic/ai_reset_helper.dart';
 import '../../logic/cook_now_service.dart';
 import '../../logic/gemini_service.dart';
 import '../../logic/suggestion_helper.dart';
 import '../../models/inventory_item.dart';
+
 import '../../widgets/suggestions/cache_notice.dart';
 import '../../widgets/suggestions/empty_card.dart';
+import '../../widgets/suggestions/inventory_changed_card.dart';
 import '../../widgets/suggestions/premium_loading_card.dart';
 import '../../widgets/suggestions/quota_status_card.dart';
 import '../../widgets/suggestions/result_cards.dart';
@@ -26,14 +30,16 @@ class SuggestionsPage extends StatefulWidget {
 class _SuggestionsPageState extends State<SuggestionsPage> {
   final GeminiService _gemini = GeminiService();
   final CookNowService _cookNowService = CookNowService();
-  final AiCacheService _cacheService = AiCacheService();
   final AiQuotaService _quotaService = AiQuotaService();
+  final AiGenerateService _aiService = AiGenerateService();
+  final AiInventoryChecker _inventoryChecker = AiInventoryChecker();
   final SuggestionHelper _helper = SuggestionHelper();
 
   bool _isLoading = false;
   bool _isCached = false;
   bool _isRecipeResult = true;
   bool _didAutoLoad = false;
+  bool _inventoryChanged = false;
 
   int _usedQuota = 0;
   int _cooldownSeconds = 0;
@@ -42,6 +48,7 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
   Timer? _resetTimer;
 
   String _resultText = '';
+  String _resultSignature = '';
   String _resetCountdown = '';
   String _resetTimeText = '';
 
@@ -66,26 +73,54 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
   Future<void> _loadQuota() async {
     final used = await _quotaService.getUsedToday();
     if (!mounted) return;
+
     setState(() => _usedQuota = used);
+  }
+
+  void _updateResetCountdown() {
+    final data = AiResetHelper.getResetInfo();
+
+    if (!mounted) return;
+
+    setState(() {
+      _resetCountdown = data['countdown'] ?? '';
+      _resetTimeText = data['timeText'] ?? '';
+    });
   }
 
   Future<void> _autoLoadCache(List<InventoryItem> items) async {
     if (_didAutoLoad) return;
     _didAutoLoad = true;
 
-    final cached = await _cacheService.getCachedResult(
+    final data = await _aiService.generate(
       type: 'recipes_v2',
       items: items,
+      fetcher: () => _gemini.generateRecipeSuggestions(items),
     );
 
-    if (cached == null || cached.isEmpty) return;
     if (!mounted) return;
 
+    if (data['isError'] == true || data['isCached'] != true) return;
+
     setState(() {
-      _resultText = cached;
+      _resultText = data['result'] ?? '';
+      _resultSignature = data['signature'] ?? '';
       _isCached = true;
       _isRecipeResult = true;
+      _inventoryChanged = false;
     });
+  }
+
+  void _checkInventoryChanged(List<InventoryItem> items) {
+    final changed = _inventoryChecker.isInventoryChanged(
+      items: items,
+      lastSignature: _resultSignature,
+      resultText: _resultText,
+    );
+
+    if (changed != _inventoryChanged) {
+      setState(() => _inventoryChanged = changed);
+    }
   }
 
   Future<void> _generateRecipes(List<InventoryItem> items) async {
@@ -119,10 +154,10 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
 
     setState(() => _isRecipeResult = isRecipe);
 
-    await _generateWithCache(type: type, items: items, fetcher: fetcher);
+    await _generateAiResult(type: type, items: items, fetcher: fetcher);
   }
 
-  Future<void> _generateWithCache({
+  Future<void> _generateAiResult({
     required String type,
     required List<InventoryItem> items,
     required Future<String> Function() fetcher,
@@ -130,30 +165,21 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
     setState(() {
       _isLoading = true;
       _isCached = false;
+      _inventoryChanged = false;
       _resultText = '';
     });
 
-    final cached = await _cacheService.getCachedResult(
+    final data = await _aiService.generate(
       type: type,
       items: items,
+      fetcher: fetcher,
     );
-
-    if (cached != null && cached.trim().isNotEmpty) {
-      if (!mounted) return;
-
-      setState(() {
-        _resultText = cached;
-        _isCached = true;
-        _isLoading = false;
-      });
-      return;
-    }
-
-    final result = await fetcher();
 
     if (!mounted) return;
 
-    if (_isErrorResult(result)) {
+    final result = data['result'] ?? '';
+
+    if (data['isError'] == true || _isErrorResult(result)) {
       final retrySeconds = _extractSeconds(result);
 
       if (retrySeconds > 0) {
@@ -162,22 +188,19 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
 
       setState(() {
         _resultText = result;
+        _resultSignature = '';
         _isCached = false;
         _isLoading = false;
       });
       return;
     }
 
-    await _cacheService.saveResult(type: type, items: items, result: result);
-
-    await _quotaService.addUsage();
     await _loadQuota();
-
-    if (!mounted) return;
 
     setState(() {
       _resultText = result;
-      _isCached = false;
+      _resultSignature = data['signature'] ?? '';
+      _isCached = data['isCached'] ?? false;
       _isLoading = false;
     });
   }
@@ -193,6 +216,7 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
 
   void _startCooldown(int seconds) {
     _cooldownTimer?.cancel();
+
     setState(() => _cooldownSeconds = seconds);
 
     _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -222,76 +246,6 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
         lower.contains('no ai suggestion');
   }
 
-  void _updateResetCountdown() {
-    final now = DateTime.now();
-    final resetTime = _nextGeminiResetMalaysiaTime(now);
-    final diff = resetTime.difference(now);
-
-    final hours = diff.inHours;
-    final minutes = diff.inMinutes.remainder(60);
-
-    final resetHour = resetTime.hour.toString().padLeft(2, '0');
-    final resetMinute = resetTime.minute.toString().padLeft(2, '0');
-
-    if (!mounted) return;
-
-    setState(() {
-      _resetCountdown = '${hours}h ${minutes}m';
-      _resetTimeText = 'Resets around $resetHour:$resetMinute Malaysia time';
-    });
-  }
-
-  DateTime _nextGeminiResetMalaysiaTime(DateTime nowMalaysia) {
-    final nowUtc = nowMalaysia.toUtc();
-
-    final currentPtOffset = _pacificOffsetHours(nowUtc);
-    final nowPt = nowUtc.add(Duration(hours: currentPtOffset));
-
-    var resetPt = DateTime(nowPt.year, nowPt.month, nowPt.day + 1);
-
-    if (nowPt.hour == 0 && nowPt.minute == 0) {
-      resetPt = DateTime(nowPt.year, nowPt.month, nowPt.day);
-    }
-
-    final resetUtc = resetPt.subtract(Duration(hours: currentPtOffset));
-    return resetUtc.toLocal();
-  }
-
-  int _pacificOffsetHours(DateTime utcDate) {
-    final year = utcDate.year;
-    final dstStart = _secondSundayOfMarchUtc(year);
-    final dstEnd = _firstSundayOfNovemberUtc(year);
-
-    final isDst = utcDate.isAfter(dstStart) && utcDate.isBefore(dstEnd);
-    return isDst ? -7 : -8;
-  }
-
-  DateTime _secondSundayOfMarchUtc(int year) {
-    final marchFirst = DateTime.utc(year, 3, 1);
-    final daysUntilSunday = (DateTime.sunday - marchFirst.weekday) % 7;
-    final secondSunday = marchFirst.add(Duration(days: daysUntilSunday + 7));
-
-    return DateTime.utc(
-      secondSunday.year,
-      secondSunday.month,
-      secondSunday.day,
-      10,
-    );
-  }
-
-  DateTime _firstSundayOfNovemberUtc(int year) {
-    final novFirst = DateTime.utc(year, 11, 1);
-    final daysUntilSunday = (DateTime.sunday - novFirst.weekday) % 7;
-    final firstSunday = novFirst.add(Duration(days: daysUntilSunday));
-
-    return DateTime.utc(
-      firstSunday.year,
-      firstSunday.month,
-      firstSunday.day,
-      9,
-    );
-  }
-
   void _showSnack(String message) {
     if (!mounted) return;
 
@@ -316,6 +270,8 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
     return Column(
       children: [
         if (_isCached) const CacheNotice(),
+        if (_inventoryChanged && _isRecipeResult)
+          InventoryChangedCard(onRegenerate: () => _generateRecipes(items)),
         ResultCards(
           results: _helper.parseRecipes(_resultText),
           inventoryItems: items,
@@ -347,6 +303,7 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
 
             WidgetsBinding.instance.addPostFrameCallback((_) {
               _autoLoadCache(items);
+              _checkInventoryChanged(items);
             });
 
             return SingleChildScrollView(
@@ -356,6 +313,7 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
                 children: [
                   const SuggestionPageTitle(),
                   const SizedBox(height: 18),
+
                   QuotaStatusCard(
                     used: _usedQuota,
                     limit: AiQuotaService.dailyLimit,
@@ -364,23 +322,31 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
                     resetCountdown: _resetCountdown,
                     resetTimeText: _resetTimeText,
                   ),
+
                   const SizedBox(height: 18),
+
                   SuggestionActionButtons(
                     onRecipeTap: () => _generateRecipes(items),
                     onRestockTap: () => _generateRestock(items),
                   ),
+
                   const SizedBox(height: 26),
+
                   const SuggestionSectionTitle(title: 'Near Expiry Items'),
                   const SizedBox(height: 12),
+
                   NearExpirySection(
                     nearExpiry: nearExpiry,
                     daysLeftText: _helper.daysLeftText,
                   ),
+
                   const SizedBox(height: 26),
+
                   SuggestionSectionTitle(
                     title: _isRecipeResult ? 'AI Recipes' : 'Restock Advice',
                   ),
                   const SizedBox(height: 12),
+
                   _buildAiResult(items),
                 ],
               ),

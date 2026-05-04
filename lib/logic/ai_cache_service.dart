@@ -6,7 +6,7 @@ class AiCacheService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   /// 🔍 GET CACHE
-  Future<String?> getCachedResult({
+  Future<Map<String, dynamic>?> getCacheDoc({
     required String type,
     required List<InventoryItem> items,
   }) async {
@@ -24,12 +24,22 @@ class AiCacheService {
 
     final age = DateTime.now().difference(createdAt.toDate());
 
-    /// ⏱️ EXPIRE AFTER 24 HOURS
+    /// expire after 24h
     if (age.inHours > 24) return null;
+
+    return data;
+  }
+
+  Future<String?> getCachedResult({
+    required String type,
+    required List<InventoryItem> items,
+  }) async {
+    final data = await getCacheDoc(type: type, items: items);
+
+    if (data == null) return null;
 
     final result = data['result'];
 
-    /// 🚫 DON'T RETURN BAD RESULT
     if (result == null || _isBadResult(result.toString())) {
       return null;
     }
@@ -37,16 +47,21 @@ class AiCacheService {
     return result;
   }
 
-  /// 💾 SAVE CACHE
+  Future<String?> getCachedSignature({
+    required String type,
+    required List<InventoryItem> items,
+  }) async {
+    final data = await getCacheDoc(type: type, items: items);
+    return data?['signature'];
+  }
+
+  /// 💾 SAVE
   Future<void> saveResult({
     required String type,
     required List<InventoryItem> items,
     required String result,
   }) async {
-    /// 🚫 DON'T SAVE FAILED RESULT
-    if (_isBadResult(result)) {
-      return;
-    }
+    if (_isBadResult(result)) return;
 
     final key = _buildCacheKey(type, items);
 
@@ -58,29 +73,28 @@ class AiCacheService {
     });
   }
 
-  /// 🚫 CHECK BAD RESULT
   bool _isBadResult(String text) {
     final lower = text.toLowerCase();
 
-    return lower.contains('failed to generate') ||
-        lower.contains('something went wrong') ||
-        lower.contains('no ai suggestion') ||
-        lower.contains('permission_denied') ||
+    return lower.contains('failed') ||
+        lower.contains('quota') ||
         lower.contains('api key') ||
-        lower.contains('quota');
+        lower.contains('try again');
   }
 
-  /// 🔑 BUILD CACHE KEY
   String _buildCacheKey(String type, List<InventoryItem> items) {
     final signature = '$type-${_buildSignature(items)}';
     return _simpleHash(signature);
   }
 
-  /// 📦 BUILD SIGNATURE
-  String _buildSignature(List<InventoryItem> items) {
-    final sortedItems = [...items]..sort((a, b) => a.name.compareTo(b.name));
+  String buildCurrentSignature(List<InventoryItem> items) {
+    return _buildSignature(items);
+  }
 
-    return sortedItems
+  String _buildSignature(List<InventoryItem> items) {
+    final sorted = [...items]..sort((a, b) => a.name.compareTo(b.name));
+
+    return sorted
         .map((item) {
           final date = item.expiryDate.toIso8601String().split('T').first;
           return '${item.name}_${item.quantity}_$date';
@@ -88,15 +102,12 @@ class AiCacheService {
         .join('|');
   }
 
-  /// 🔢 SIMPLE HASH
   String _simpleHash(String input) {
     var hash = 5381;
-
-    for (final codeUnit in input.codeUnits) {
-      hash = ((hash << 5) + hash) + codeUnit;
+    for (final c in input.codeUnits) {
+      hash = ((hash << 5) + hash) + c;
       hash = hash & 0x7fffffff;
     }
-
     return hash.toString();
   }
 }
