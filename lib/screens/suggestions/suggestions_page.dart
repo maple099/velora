@@ -5,9 +5,7 @@ import '../../logic/ai_cache_service.dart';
 import '../../logic/cook_now_service.dart';
 import '../../logic/gemini_service.dart';
 import '../../logic/suggestion_helper.dart';
-
 import '../../models/inventory_item.dart';
-
 import '../../widgets/suggestions/cache_notice.dart';
 import '../../widgets/suggestions/empty_card.dart';
 import '../../widgets/suggestions/header_card.dart';
@@ -23,20 +21,35 @@ class SuggestionsPage extends StatefulWidget {
 }
 
 class _SuggestionsPageState extends State<SuggestionsPage> {
-  /// 🔥 SERVICES
   final GeminiService _gemini = GeminiService();
   final CookNowService _cookNowService = CookNowService();
   final AiCacheService _cacheService = AiCacheService();
   final SuggestionHelper _helper = SuggestionHelper();
 
-  /// 🔥 STATE
   bool _isLoading = false;
   bool _isCached = false;
   String _resultText = '';
 
-  /// ===============================
-  /// 🔥 GENERATE WITH CACHE
-  /// ===============================
+  Future<void> _generateRecipes(List<InventoryItem> items) async {
+    debugPrint('🔥 BUTTON CLICKED: Generate Recipes');
+
+    await _generateWithCache(
+      type: 'recipes_v2',
+      items: items,
+      fetcher: () => _gemini.generateRecipeSuggestions(items),
+    );
+  }
+
+  Future<void> _generateRestock(List<InventoryItem> items) async {
+    debugPrint('🔥 BUTTON CLICKED: Restock Advice');
+
+    await _generateWithCache(
+      type: 'restock_v2',
+      items: items,
+      fetcher: () => _gemini.generateRestockRecommendations(items),
+    );
+  }
+
   Future<void> _generateWithCache({
     required String type,
     required List<InventoryItem> items,
@@ -48,7 +61,6 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
       _resultText = '';
     });
 
-    /// ✅ CHECK CACHE FIRST
     final cached = await _cacheService.getCachedResult(
       type: type,
       items: items,
@@ -65,10 +77,8 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
       return;
     }
 
-    /// ❌ NOT CACHED → CALL GEMINI
     final result = await fetcher();
 
-    /// SAVE CACHE
     await _cacheService.saveResult(type: type, items: items, result: result);
 
     if (!mounted) return;
@@ -80,24 +90,6 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
     });
   }
 
-  /// 🔥 ACTIONS
-  Future<void> _generateRecipes(List<InventoryItem> items) async {
-    await _generateWithCache(
-      type: 'recipes',
-      items: items,
-      fetcher: () => _gemini.generateRecipeSuggestions(items),
-    );
-  }
-
-  Future<void> _generateRestock(List<InventoryItem> items) async {
-    await _generateWithCache(
-      type: 'restock',
-      items: items,
-      fetcher: () => _gemini.generateRestockRecommendations(items),
-    );
-  }
-
-  /// 🔥 COOK LOGIC
   Future<void> _cookRecipe(List<InventoryItem> usedItems) async {
     try {
       await _cookNowService.cookRecipe(usedItems);
@@ -115,27 +107,20 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
     );
   }
 
-  /// ===============================
-  /// 🔥 UI BUILDER (AI RESULT)
-  /// ===============================
   Widget _buildAiResult(List<InventoryItem> items) {
-    /// 🔄 LOADING
     if (_isLoading) {
       return const PremiumLoadingCard();
     }
 
-    /// 💤 EMPTY
     if (_resultText.isEmpty) {
       return const EmptyCard(
         text: 'Press Generate Recipes or Restock Advice to get AI suggestions.',
       );
     }
 
-    /// ✅ RESULT
     return Column(
       children: [
         if (_isCached) const CacheNotice(),
-
         ResultCards(
           recipes: _helper.parseRecipes(_resultText),
           inventoryItems: items,
@@ -145,14 +130,10 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
     );
   }
 
-  /// ===============================
-  /// 🔥 MAIN BUILD
-  /// ===============================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-
       body: SafeArea(
         child: StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
@@ -163,7 +144,6 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
               return const Center(child: CircularProgressIndicator());
             }
 
-            /// 🔄 CONVERT DATA
             final items = _helper.convertDocs(snapshot.data!.docs);
             final nearExpiry = _helper.nearExpiryItems(items);
 
@@ -172,44 +152,30 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  /// 🟣 TITLE
                   const SuggestionPageTitle(),
-
                   const SizedBox(height: 18),
-
-                  /// 📊 HEADER
                   HeaderCard(
                     totalItems: items.length,
                     nearExpiry: nearExpiry.length,
                   ),
-
                   const SizedBox(height: 18),
 
-                  /// ⚡ ACTION BUTTONS
+                  // ✅ BUTTON CONNECTION IS HERE
                   SuggestionActionButtons(
                     onRecipeTap: () => _generateRecipes(items),
                     onRestockTap: () => _generateRestock(items),
                   ),
 
                   const SizedBox(height: 24),
-
-                  /// 🔥 NEAR EXPIRY
                   const SuggestionSectionTitle(title: 'Near Expiry Items'),
-
                   const SizedBox(height: 12),
-
                   NearExpirySection(
                     nearExpiry: nearExpiry,
                     daysLeftText: _helper.daysLeftText,
                   ),
-
                   const SizedBox(height: 24),
-
-                  /// 🤖 AI RESULT
                   const SuggestionSectionTitle(title: 'AI Result'),
-
                   const SizedBox(height: 12),
-
                   _buildAiResult(items),
                 ],
               ),

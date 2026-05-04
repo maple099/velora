@@ -1,5 +1,6 @@
 name: velora
-description: "A new Flutter project."
+description: "AI smart-inventory."
+
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -15,7 +16,7 @@ dependencies:
   firebase_core: ^4.2.1
   cupertino_icons: ^1.0.8
   fl_chart: ^0.68.0
-  google_generative_ai: ^0.4.7
+  http: ^1.2.2
 
 dev_dependencies:
   flutter_test:

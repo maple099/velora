@@ -37,7 +37,8 @@ class SuggestionHelper {
 
   List<Map<String, String>> parseRecipes(String text) {
     final recipes = <Map<String, String>>[];
-    final parts = text.split('###');
+    final cleanedText = cleanAiText(text);
+    final parts = cleanedText.split('###');
 
     for (final part in parts) {
       final clean = part.trim();
@@ -51,8 +52,8 @@ class SuggestionHelper {
       });
     }
 
-    if (recipes.isEmpty && text.trim().isNotEmpty) {
-      recipes.add({'title': 'AI Suggestion', 'content': text});
+    if (recipes.isEmpty && cleanedText.trim().isNotEmpty) {
+      recipes.add({'title': 'AI Suggestion', 'content': cleanedText.trim()});
     }
 
     return recipes;
@@ -82,5 +83,15 @@ class SuggestionHelper {
     if (days == 0) return 'Expires today';
     if (days == 1) return 'Expires tomorrow';
     return 'Expires in $days days';
+  }
+
+  String cleanAiText(String text) {
+    return text
+        .replaceAll('**', '')
+        .replaceAll('*', '')
+        .replaceAll('`', '')
+        .replaceAll('####', '')
+        .replaceAll('### ', '### ')
+        .trim();
   }
 }

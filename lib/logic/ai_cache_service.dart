@@ -5,6 +5,7 @@ import '../models/inventory_item.dart';
 class AiCacheService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  /// 🔍 GET CACHE
   Future<String?> getCachedResult({
     required String type,
     required List<InventoryItem> items,
@@ -23,16 +24,30 @@ class AiCacheService {
 
     final age = DateTime.now().difference(createdAt.toDate());
 
+    /// ⏱️ EXPIRE AFTER 24 HOURS
     if (age.inHours > 24) return null;
 
-    return data['result'] ?? '';
+    final result = data['result'];
+
+    /// 🚫 DON'T RETURN BAD RESULT
+    if (result == null || _isBadResult(result.toString())) {
+      return null;
+    }
+
+    return result;
   }
 
+  /// 💾 SAVE CACHE
   Future<void> saveResult({
     required String type,
     required List<InventoryItem> items,
     required String result,
   }) async {
+    /// 🚫 DON'T SAVE FAILED RESULT
+    if (_isBadResult(result)) {
+      return;
+    }
+
     final key = _buildCacheKey(type, items);
 
     await _firestore.collection('ai_cache').doc(key).set({
@@ -43,11 +58,25 @@ class AiCacheService {
     });
   }
 
+  /// 🚫 CHECK BAD RESULT
+  bool _isBadResult(String text) {
+    final lower = text.toLowerCase();
+
+    return lower.contains('failed to generate') ||
+        lower.contains('something went wrong') ||
+        lower.contains('no ai suggestion') ||
+        lower.contains('permission_denied') ||
+        lower.contains('api key') ||
+        lower.contains('quota');
+  }
+
+  /// 🔑 BUILD CACHE KEY
   String _buildCacheKey(String type, List<InventoryItem> items) {
     final signature = '$type-${_buildSignature(items)}';
     return _simpleHash(signature);
   }
 
+  /// 📦 BUILD SIGNATURE
   String _buildSignature(List<InventoryItem> items) {
     final sortedItems = [...items]..sort((a, b) => a.name.compareTo(b.name));
 
@@ -59,6 +88,7 @@ class AiCacheService {
         .join('|');
   }
 
+  /// 🔢 SIMPLE HASH
   String _simpleHash(String input) {
     var hash = 5381;
 

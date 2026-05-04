@@ -18,28 +18,33 @@ class ActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = isPrimary ? const Color(0xFF7C3AED) : Colors.white;
-    final textColor = isPrimary ? Colors.white : const Color(0xFF7C3AED);
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(22),
-      onTap: onTap,
+    return GestureDetector(
+      onTap: onTap, // 🔥 THIS IS IMPORTANT
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(22),
+          gradient: isPrimary
+              ? const LinearGradient(
+                  colors: [Color(0xFF7C3AED), Color(0xFFA855F7)],
+                )
+              : null,
+          color: isPrimary ? null : Colors.white,
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(color: const Color(0xFFE5E7EB)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: textColor, size: 26),
-            const SizedBox(height: 12),
+            Icon(
+              icon,
+              color: isPrimary ? Colors.white : const Color(0xFF7C3AED),
+              size: 26,
+            ),
+            const SizedBox(height: 10),
             Text(
               title,
               style: TextStyle(
-                color: textColor,
+                color: isPrimary ? Colors.white : const Color(0xFF111827),
                 fontWeight: FontWeight.w900,
                 fontSize: 14,
               ),
@@ -48,8 +53,11 @@ class ActionCard extends StatelessWidget {
             Text(
               subtitle,
               style: TextStyle(
-                color: isPrimary ? Colors.white70 : const Color(0xFF6B7280),
+                color: isPrimary
+                    ? Colors.white.withOpacity(0.85)
+                    : const Color(0xFF6B7280),
                 fontSize: 12,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
