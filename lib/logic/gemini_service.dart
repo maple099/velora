@@ -17,7 +17,7 @@ class GeminiService {
 
   Future<String> generateRecipeSuggestions(List<InventoryItem> items) async {
     if (items.isEmpty) {
-      return _fallbackRecipes();
+      return _emptyRecipeMessage();
     }
 
     final itemText = items
@@ -35,13 +35,15 @@ Expiry Date: ${_formatDate(item.expiryDate)}
         '''
 You are an AI assistant for Velora, a smart F&B inventory mobile app.
 
-Based on these inventory items, suggest recipe ideas that reduce food waste.
+Suggest recipe ideas that reduce food waste.
 
 IMPORTANT RULES:
 - Give between 1 to 6 recipe suggestions.
+- Use ONLY ingredients from the inventory list.
+- Do NOT add ingredients that are not in the inventory.
 - Focus on near-expiry items first.
 - Use simple student-friendly English.
-- Each recipe MUST start with this format:
+- Each recipe MUST start with:
 ### Recipe Name
 
 For each recipe, include:
@@ -66,12 +68,12 @@ $itemText
       final text = response.text;
 
       if (text == null || text.trim().isEmpty) {
-        return _fallbackRecipes();
+        return _smartFallbackRecipes(items);
       }
 
       return text;
     } catch (_) {
-      return _fallbackRecipes();
+      return _smartFallbackRecipes(items);
     }
   }
 
@@ -79,7 +81,7 @@ $itemText
     List<InventoryItem> items,
   ) async {
     if (items.isEmpty) {
-      return _fallbackRestock();
+      return _emptyRestockMessage();
     }
 
     final itemText = items
@@ -116,92 +118,162 @@ $itemText
       final text = response.text;
 
       if (text == null || text.trim().isEmpty) {
-        return _fallbackRestock();
+        return _smartFallbackRestock(items);
       }
 
       return text;
     } catch (_) {
-      return _fallbackRestock();
+      return _smartFallbackRestock(items);
     }
+  }
+
+  String _smartFallbackRecipes(List<InventoryItem> items) {
+    final availableItems = items.where((item) => item.quantity > 0).toList()
+      ..sort((a, b) => a.expiryDate.compareTo(b.expiryDate));
+
+    if (availableItems.isEmpty) {
+      return _emptyRecipeMessage();
+    }
+
+    final recipeCount = availableItems.length.clamp(1, 6);
+    final selectedItems = availableItems.take(recipeCount).toList();
+
+    final recipes = selectedItems
+        .map((mainItem) {
+          final helperItems = availableItems
+              .where((item) => item.id != mainItem.id)
+              .take(2)
+              .toList();
+
+          final ingredients = [mainItem, ...helperItems];
+
+          final recipeName = _recipeName(mainItem, helperItems);
+
+          final ingredientText = ingredients
+              .map((item) => '- ${_capitalize(item.name)}')
+              .join('\n');
+
+          return '''
+### $recipeName
+
+**Ingredients to use:**
+$ingredientText
+
+**Simple steps:**
+1. Prepare ${ingredients.map((item) => item.name).join(', ')}.
+2. Cook or combine the ingredients in a simple way.
+3. Serve while fresh.
+
+**Why this helps reduce waste:**
+This recipe helps use ${_capitalize(mainItem.name)} before it expires.
+''';
+        })
+        .join('\n\n');
+
+    return recipes;
+  }
+
+  String _smartFallbackRestock(List<InventoryItem> items) {
+    final lowItems = items.where((item) => item.quantity <= 2).toList();
+
+    if (lowItems.isEmpty) {
+      return '''
+### Smart Restock Advice
+
+**Items to check:**
+- Your current stock looks enough for now.
+
+**Simple recommendation:**
+1. No urgent restock is needed.
+2. Use near-expiry items first.
+3. Check inventory again after stock decreases.
+
+**Why this helps:**
+This helps avoid overbuying and reduces food waste.
+''';
+    }
+
+    final itemText = lowItems
+        .map((item) {
+          return '- ${_capitalize(item.name)} | Qty: ${item.quantity}';
+        })
+        .join('\n');
+
+    return '''
+### Smart Restock Advice
+
+**Items to check:**
+$itemText
+
+**Simple recommendation:**
+1. Restock low quantity items first.
+2. Buy fresh food in small amounts.
+3. Avoid overstocking items that expire quickly.
+
+**Why this helps:**
+This helps keep enough stock while reducing expired food.
+''';
+  }
+
+  String _recipeName(InventoryItem mainItem, List<InventoryItem> helperItems) {
+    final mainName = _capitalize(mainItem.name);
+
+    if (helperItems.isEmpty) {
+      return 'Simple $mainName Recipe';
+    }
+
+    final secondName = _capitalize(helperItems.first.name);
+
+    final category = mainItem.category.toLowerCase();
+
+    if (category.contains('bakery')) return '$mainName with $secondName';
+    if (category.contains('meat')) return '$mainName Quick Meal';
+    if (category.contains('dairy')) return '$mainName Mix Bowl';
+    if (category.contains('vegetable')) return '$mainName Fresh Dish';
+
+    return '$mainName and $secondName Recipe';
+  }
+
+  String _emptyRecipeMessage() {
+    return '''
+### No Recipe Available
+
+**Ingredients to use:**
+- No available inventory items
+
+**Simple steps:**
+1. Add inventory items first.
+2. Set quantity and expiry date.
+3. Generate recipe suggestions again.
+
+**Why this helps reduce waste:**
+Velora needs your inventory data to suggest useful recipes.
+''';
+  }
+
+  String _emptyRestockMessage() {
+    return '''
+### No Restock Data Available
+
+**Items to check:**
+- No inventory items found
+
+**Simple recommendation:**
+1. Add items into inventory first.
+2. Track quantity and expiry date.
+3. Generate restock advice again.
+
+**Why this helps:**
+Velora needs inventory data to give better restock suggestions.
+''';
   }
 
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
   }
 
-  String _fallbackRecipes() {
-    return '''
-### Tomato Egg Toast
-
-**Ingredients to use:**
-- Bread
-- Egg
-- Tomato
-
-**Simple steps:**
-1. Toast the bread until slightly crispy.
-2. Cook the egg in a pan.
-3. Add tomato slices on top of the toast.
-4. Serve while warm.
-
-**Why this helps reduce waste:**
-This recipe helps use bread, egg, and tomato before they expire.
-
-
-### Chicken Egg Fried Rice
-
-**Ingredients to use:**
-- Chicken
-- Egg
-- Rice
-- Onion
-
-**Simple steps:**
-1. Cut the chicken into small pieces.
-2. Cook the chicken in a pan.
-3. Add rice and egg.
-4. Mix everything until cooked.
-
-**Why this helps reduce waste:**
-This recipe uses leftover rice, chicken, and egg in one simple meal.
-
-
-### Bread Pudding
-
-**Ingredients to use:**
-- Bread
-- Milk
-- Egg
-
-**Simple steps:**
-1. Cut bread into small pieces.
-2. Mix milk and egg together.
-3. Pour the mixture over the bread.
-4. Bake or steam until soft.
-
-**Why this helps reduce waste:**
-This recipe is useful when bread is near expiry.
-''';
-  }
-
-  String _fallbackRestock() {
-    return '''
-### Smart Restock Advice
-
-**Items to check:**
-- Rice
-- Milk
-- Egg
-- Chicken
-
-**Simple recommendation:**
-1. Restock items with low quantity first.
-2. Avoid buying too much food that expires quickly.
-3. Buy dry food in larger amounts because it lasts longer.
-4. Buy fresh food in smaller amounts to reduce waste.
-
-**Why this helps:**
-This helps keep enough stock while avoiding expired food.
-''';
+  String _capitalize(String value) {
+    if (value.isEmpty) return value;
+    return value[0].toUpperCase() + value.substring(1);
   }
 }
