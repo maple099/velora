@@ -27,6 +27,8 @@ class InventoryCard extends StatelessWidget {
         return const Color(0xFFFEE2E2);
       case 'bakery':
         return const Color(0xFFFEF3C7);
+      case 'meat':
+        return const Color(0xFFFFEDD5);
       default:
         return const Color(0xFFF3E8FF);
     }
@@ -42,10 +44,14 @@ class InventoryCard extends StatelessWidget {
         return const Color(0xFFDC2626);
       case 'bakery':
         return const Color(0xFFB45309);
+      case 'meat':
+        return const Color(0xFFEA580C);
       default:
         return const Color(0xFF7C3AED);
     }
   }
+
+  bool get _isLowStock => item.quantity <= 3;
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +63,6 @@ class InventoryCard extends StatelessWidget {
         );
       },
       child: Container(
-        // ❌ NO FIXED HEIGHT (IMPORTANT FIX)
         margin: const EdgeInsets.only(bottom: 13),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -102,10 +107,12 @@ class InventoryCard extends StatelessWidget {
                   const SizedBox(height: 5),
                   Text(
                     '${item.category} • Qty: ${item.quantity}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF374151),
+                      fontWeight: FontWeight.w700,
+                      color: _isLowStock
+                          ? const Color(0xFFEF4444)
+                          : const Color(0xFF374151),
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -125,6 +132,27 @@ class InventoryCard extends StatelessWidget {
                       color: Color(0xFF7C3AED),
                     ),
                   ),
+                  if (_isLowStock) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        'Low Stock',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

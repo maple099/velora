@@ -33,12 +33,12 @@ class _InventoryPageState extends State<InventoryPage> {
       if (selectedFilter == 'All Items') return matchSearch;
 
       if (selectedFilter == 'Low Stock') {
-        return matchSearch && item.quantity <= 5;
+        return matchSearch && item.quantity <= 3;
       }
 
       if (selectedFilter == 'Near Expiry') {
         final daysLeft = ExpiryHelper.daysLeft(item.expiryDate);
-        return matchSearch && daysLeft >= 0 && daysLeft <= 4;
+        return matchSearch && daysLeft >= 0 && daysLeft <= 7;
       }
 
       return matchSearch;
@@ -90,7 +90,7 @@ class _InventoryPageState extends State<InventoryPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _header(),
+              _header(context),
               const SizedBox(height: 22),
               _searchBar(),
               const SizedBox(height: 14),
@@ -104,66 +104,23 @@ class _InventoryPageState extends State<InventoryPage> {
     );
   }
 
-  Widget _inventoryList() {
-    return StreamBuilder<List<InventoryItem>>(
-      stream: FirestoreService.instance.getItems(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Padding(
-            padding: EdgeInsets.only(top: 60),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        if (snapshot.hasError) {
-          return const Padding(
-            padding: EdgeInsets.only(top: 40),
-            child: Center(child: Text('Something went wrong')),
-          );
-        }
-
-        final items = snapshot.data ?? [];
-        final filteredItems = _filterItems(items);
-
-        if (filteredItems.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.only(top: 40),
-            child: Center(
-              child: Text(
-                'No items found',
-                style: TextStyle(
-                  color: Color(0xFF6B7280),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          );
-        }
-
-        return Column(
-          children: filteredItems.map((item) {
-            return InventoryCard(
-              item: item,
-              icon: _iconForCategory(item.category),
-              expiryText: _formatDate(item.expiryDate),
-              daysLeftText: ExpiryHelper.daysLeftText(item.expiryDate),
-            );
-          }).toList(),
-        );
-      },
-    );
-  }
-
-  Widget _header() {
-    return const Row(
+  Widget _header(BuildContext context) {
+    return Row(
       children: [
-        Icon(
-          Icons.arrow_back_ios_new_rounded,
-          size: 20,
-          color: Color(0xFF111827),
+        IconButton(
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            size: 20,
+            color: Color(0xFF111827),
+          ),
+          onPressed: () {
+            Navigator.pop(context);
+          },
         ),
-        SizedBox(width: 18),
-        Text(
+        const SizedBox(width: 18),
+        const Text(
           'Inventory',
           style: TextStyle(
             fontSize: 22,
@@ -256,6 +213,56 @@ class _InventoryPageState extends State<InventoryPage> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  Widget _inventoryList() {
+    return StreamBuilder<List<InventoryItem>>(
+      stream: FirestoreService.instance.getItems(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.only(top: 60),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return const Padding(
+            padding: EdgeInsets.only(top: 40),
+            child: Center(child: Text('Something went wrong')),
+          );
+        }
+
+        final items = snapshot.data ?? [];
+        final filteredItems = _filterItems(items);
+
+        if (filteredItems.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.only(top: 40),
+            child: Center(
+              child: Text(
+                'No items found',
+                style: TextStyle(
+                  color: Color(0xFF6B7280),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          );
+        }
+
+        return Column(
+          children: filteredItems.map((item) {
+            return InventoryCard(
+              item: item,
+              icon: _iconForCategory(item.category),
+              expiryText: _formatDate(item.expiryDate),
+              daysLeftText: ExpiryHelper.daysLeftText(item.expiryDate),
+            );
+          }).toList(),
+        );
+      },
     );
   }
 }
