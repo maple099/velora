@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../logic/ai_cache_service.dart';
+import '../../logic/cook_now_service.dart';
 import '../../logic/gemini_service.dart';
+import '../../logic/suggestion_helper.dart';
 import '../../models/inventory_item.dart';
-
-// ✅ FIXED IMPORT PATH (widgets not widget)
-import '../../widgets/suggestions/action_card.dart';
+import '../../widgets/suggestions/cache_notice.dart';
+import '../../widgets/suggestions/cook_now_sheet.dart';
 import '../../widgets/suggestions/empty_card.dart';
 import '../../widgets/suggestions/header_card.dart';
-import '../../widgets/suggestions/loading_card.dart';
-import '../../widgets/suggestions/near_expiry_card.dart';
+import '../../widgets/suggestions/premium_loading_card.dart';
 import '../../widgets/suggestions/result_cards.dart';
+import '../../widgets/suggestions/suggestion_sections.dart';
 
 class SuggestionsPage extends StatefulWidget {
   const SuggestionsPage({super.key});
@@ -21,113 +23,134 @@ class SuggestionsPage extends StatefulWidget {
 
 class _SuggestionsPageState extends State<SuggestionsPage> {
   final GeminiService _gemini = GeminiService();
+  final CookNowService _cookNowService = CookNowService();
+  final AiCacheService _cacheService = AiCacheService();
+  final SuggestionHelper _helper = SuggestionHelper();
 
   bool _isLoading = false;
+  bool _isCached = false;
   String _resultText = '';
 
-  /// 🔥 GENERATE RECIPES
   Future<void> _generateRecipes(List<InventoryItem> items) async {
-    setState(() {
-      _isLoading = true;
-      _resultText = '';
-    });
-
-    final result = await _gemini.generateRecipeSuggestions(items);
-
-    setState(() {
-      _resultText = result;
-      _isLoading = false;
-    });
+    await _generateWithCache(
+      type: 'recipes',
+      items: items,
+      fetcher: () => _gemini.generateRecipeSuggestions(items),
+    );
   }
 
-  /// 🔥 GENERATE RESTOCK
   Future<void> _generateRestock(List<InventoryItem> items) async {
+    await _generateWithCache(
+      type: 'restock',
+      items: items,
+      fetcher: () => _gemini.generateRestockRecommendations(items),
+    );
+  }
+
+  Future<void> _generateWithCache({
+    required String type,
+    required List<InventoryItem> items,
+    required Future<String> Function() fetcher,
+  }) async {
     setState(() {
       _isLoading = true;
+      _isCached = false;
       _resultText = '';
     });
 
-    final result = await _gemini.generateRestockRecommendations(items);
+    final cachedResult = await _cacheService.getCachedResult(
+      type: type,
+      items: items,
+    );
+
+    if (cachedResult != null && cachedResult.trim().isNotEmpty) {
+      if (!mounted) return;
+
+      setState(() {
+        _resultText = cachedResult;
+        _isCached = true;
+        _isLoading = false;
+      });
+      return;
+    }
+
+    final result = await fetcher();
+
+    await _cacheService.saveResult(type: type, items: items, result: result);
+
+    if (!mounted) return;
 
     setState(() {
       _resultText = result;
+      _isCached = false;
       _isLoading = false;
     });
   }
 
-  /// 🔥 CONVERT FIRESTORE → MODEL
-  List<InventoryItem> _convertDocs(List<QueryDocumentSnapshot> docs) {
-    return docs.map((doc) {
-      final data = doc.data() as Map<String, dynamic>;
+  Future<void> _showCookNowSheet(
+    Map<String, String> recipe,
+    List<InventoryItem> items,
+  ) async {
+    final matchedItems = _helper.matchedIngredients(recipe, items);
 
-      return InventoryItem(
-        id: doc.id,
-        name: data['name'] ?? '',
-        category: data['category'] ?? '',
-        quantity: data['quantity'] ?? 0,
-        expiryDate: data['expiryDate'] is Timestamp
-            ? (data['expiryDate'] as Timestamp).toDate()
-            : DateTime.now(),
-        imageUrl: data['imageUrl'] ?? '',
-        createdAt: data['createdAt'] is Timestamp
-            ? (data['createdAt'] as Timestamp).toDate()
-            : DateTime.now(),
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return CookNowSheet(
+          recipeTitle: recipe['title'] ?? 'Recipe',
+          matchedItems: matchedItems,
+          onConfirm: () async {
+            Navigator.pop(context);
+            await _cookRecipe(matchedItems);
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _cookRecipe(List<InventoryItem> usedItems) async {
+    try {
+      await _cookNowService.cookRecipe(usedItems);
+      _showSnack('Ingredients marked as used.');
+    } catch (e) {
+      _showSnack('Failed to cook recipe.');
+    }
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  Widget _buildAiResult(List<InventoryItem> items) {
+    if (_isLoading) return const PremiumLoadingCard();
+
+    if (_resultText.isEmpty) {
+      return const EmptyCard(
+        text: 'Press Generate Recipes or Restock Advice to get AI suggestions.',
       );
-    }).toList();
-  }
-
-  /// 🔥 NEAR EXPIRY FILTER
-  List<InventoryItem> _nearExpiryItems(List<InventoryItem> items) {
-    final now = DateTime.now();
-
-    final filtered = items.where((item) {
-      final daysLeft = item.expiryDate.difference(now).inDays;
-      return daysLeft <= 7;
-    }).toList();
-
-    filtered.sort((a, b) => a.expiryDate.compareTo(b.expiryDate));
-    return filtered.take(4).toList();
-  }
-
-  /// 🔥 PARSE GEMINI TEXT → CARDS
-  List<Map<String, String>> _parseRecipes(String text) {
-    final recipes = <Map<String, String>>[];
-    final parts = text.split('###');
-
-    for (final part in parts) {
-      final clean = part.trim();
-      if (clean.isEmpty) continue;
-
-      final lines = clean.split('\n');
-
-      recipes.add({
-        'title': lines.first.trim(),
-        'content': lines.skip(1).join('\n').trim(),
-      });
     }
 
-    if (recipes.isEmpty && text.trim().isNotEmpty) {
-      recipes.add({'title': 'AI Suggestion', 'content': text});
-    }
-
-    return recipes;
-  }
-
-  /// 🔥 DAYS LEFT TEXT
-  String _daysLeftText(DateTime expiryDate) {
-    final days = expiryDate.difference(DateTime.now()).inDays;
-
-    if (days < 0) return 'Expired';
-    if (days == 0) return 'Expires today';
-    if (days == 1) return 'Expires tomorrow';
-    return 'Expires in $days days';
+    return Column(
+      children: [
+        if (_isCached) const CacheNotice(),
+        ResultCards(
+          recipes: _helper.parseRecipes(_resultText),
+          inventoryItems: items,
+          onCookNow: (recipe) => _showCookNowSheet(recipe, items),
+        ),
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-
       body: SafeArea(
         child: StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
@@ -138,130 +161,36 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
               return const Center(child: CircularProgressIndicator());
             }
 
-            final items = _convertDocs(snapshot.data!.docs);
-            final nearExpiry = _nearExpiryItems(items);
+            final items = _helper.convertDocs(snapshot.data!.docs);
+            final nearExpiry = _helper.nearExpiryItems(items);
 
             return SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(18, 18, 18, 110),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  /// TITLE
-                  const Text(
-                    'AI Suggestions',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF111827),
-                    ),
-                  ),
-
-                  const SizedBox(height: 4),
-
-                  const Text(
-                    'Smart recipes & restock advice',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF6B7280),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-
+                  const SuggestionPageTitle(),
                   const SizedBox(height: 18),
-
-                  /// HEADER CARD
                   HeaderCard(
                     totalItems: items.length,
                     nearExpiry: nearExpiry.length,
                   ),
-
                   const SizedBox(height: 18),
-
-                  /// ACTION BUTTONS
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ActionCard(
-                          title: 'Generate Recipes',
-                          subtitle: 'Reduce food waste',
-                          icon: Icons.restaurant,
-                          isPrimary: true,
-                          onTap: () => _generateRecipes(items),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ActionCard(
-                          title: 'Restock Advice',
-                          subtitle: 'Smart stock tips',
-                          icon: Icons.shopping_cart,
-                          isPrimary: false,
-                          onTap: () => _generateRestock(items),
-                        ),
-                      ),
-                    ],
+                  SuggestionActionButtons(
+                    onRecipeTap: () => _generateRecipes(items),
+                    onRestockTap: () => _generateRestock(items),
                   ),
-
                   const SizedBox(height: 24),
-
-                  /// NEAR EXPIRY TITLE
-                  const Text(
-                    'Near Expiry Items',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF111827),
-                    ),
-                  ),
-
+                  const SuggestionSectionTitle(title: 'Near Expiry Items'),
                   const SizedBox(height: 12),
-
-                  /// NEAR EXPIRY LIST
-                  if (nearExpiry.isEmpty)
-                    const EmptyCard(text: 'No near-expiry items found.')
-                  else
-                    SizedBox(
-                      height: 180,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: nearExpiry.length,
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(width: 12),
-                        itemBuilder: (context, index) {
-                          final item = nearExpiry[index];
-
-                          return NearExpiryCard(
-                            item: item,
-                            daysLeft: _daysLeftText(item.expiryDate),
-                          );
-                        },
-                      ),
-                    ),
-
+                  NearExpirySection(
+                    nearExpiry: nearExpiry,
+                    daysLeftText: _helper.daysLeftText,
+                  ),
                   const SizedBox(height: 24),
-
-                  /// RESULT TITLE
-                  const Text(
-                    'AI Result',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF111827),
-                    ),
-                  ),
-
+                  const SuggestionSectionTitle(title: 'AI Result'),
                   const SizedBox(height: 12),
-
-                  /// RESULT STATE
-                  if (_isLoading)
-                    const LoadingCard()
-                  else if (_resultText.isEmpty)
-                    const EmptyCard(
-                      text:
-                          'Press Generate Recipes or Restock Advice to get AI suggestions.',
-                    )
-                  else
-                    ResultCards(recipes: _parseRecipes(_resultText)),
+                  _buildAiResult(items),
                 ],
               ),
             );

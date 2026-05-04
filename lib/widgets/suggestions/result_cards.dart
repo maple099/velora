@@ -1,115 +1,139 @@
 import 'package:flutter/material.dart';
 
-import '../../screens/suggestions/recipe_detail_page.dart';
-import 'recipe_result_tile.dart';
+import '../../models/inventory_item.dart';
 
 class ResultCards extends StatelessWidget {
   final List<Map<String, String>> recipes;
+  final List<InventoryItem> inventoryItems;
+  final void Function(Map<String, String> recipe) onCookNow;
 
-  const ResultCards({super.key, required this.recipes});
-
-  bool _isError(String text) {
-    final lower = text.toLowerCase();
-
-    return lower.contains('gemini failed') ||
-        lower.contains('gemini error') ||
-        lower.contains('api key') ||
-        lower.contains('internet') ||
-        lower.contains('failed to generate');
-  }
-
-  String _previewText(String content) {
-    final clean = content
-        .replaceAll('*', '')
-        .replaceAll('#', '')
-        .replaceAll('-', '')
-        .trim();
-
-    final lines = clean
-        .split('\n')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-
-    if (lines.isEmpty) return 'Tap to view full AI suggestion.';
-
-    return lines.first.length > 80
-        ? '${lines.first.substring(0, 80)}...'
-        : lines.first;
-  }
+  const ResultCards({
+    super.key,
+    required this.recipes,
+    required this.inventoryItems,
+    required this.onCookNow,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final firstText = recipes.isNotEmpty
-        ? '${recipes.first['title'] ?? ''} ${recipes.first['content'] ?? ''}'
-        : '';
-
-    /// 🔥 SHOW ERROR (WITH REAL MESSAGE)
-    if (_isError(firstText)) {
-      return _ErrorCard(message: firstText);
-    }
-
-    /// 🔥 NORMAL RESULT
     return Column(
-      children: [
-        _InfoBanner(count: recipes.length),
-        const SizedBox(height: 12),
-
-        ...recipes.map((recipe) {
-          final title = recipe['title'] ?? 'AI Suggestion';
-          final content = recipe['content'] ?? '';
-
-          return RecipeResultTile(
-            title: title,
-            subtitle: _previewText(content),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      RecipeDetailPage(title: title, content: content),
-                ),
-              );
-            },
-          );
-        }),
-      ],
+      children: recipes.map((recipe) {
+        return _RecipeCard(
+          recipe: recipe,
+          inventoryItems: inventoryItems,
+          onCookNow: onCookNow,
+        );
+      }).toList(),
     );
   }
 }
 
-class _ErrorCard extends StatelessWidget {
-  final String message;
+class _RecipeCard extends StatelessWidget {
+  final Map<String, String> recipe;
+  final List<InventoryItem> inventoryItems;
+  final void Function(Map<String, String> recipe) onCookNow;
 
-  const _ErrorCard({required this.message});
+  const _RecipeCard({
+    required this.recipe,
+    required this.inventoryItems,
+    required this.onCookNow,
+  });
+
+  List<InventoryItem> _matchedItems() {
+    final text = '${recipe['title'] ?? ''} ${recipe['content'] ?? ''}'
+        .toLowerCase();
+
+    return inventoryItems.where((item) {
+      final name = item.name.toLowerCase().trim();
+
+      if (name.isEmpty) return false;
+      if (item.quantity <= 0) return false;
+
+      return text.contains(name);
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final title = recipe['title'] ?? 'AI Suggestion';
+    final content = recipe['content'] ?? '';
+    final matchedItems = _matchedItems();
+
     return Container(
       width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF7ED),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFFED7AA)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
-            Icons.warning_amber_rounded,
-            color: Color(0xFFF97316),
-            size: 28,
+          Row(
+            children: [
+              const _IconBox(),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF111827),
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              message, // 🔥 SHOW REAL ERROR HERE
-              style: const TextStyle(
-                color: Color(0xFF9A3412),
-                fontSize: 13,
-                height: 1.4,
-                fontWeight: FontWeight.w700,
+          const SizedBox(height: 14),
+          Text(
+            content,
+            style: const TextStyle(
+              fontSize: 13.5,
+              height: 1.45,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF4B5563),
+            ),
+          ),
+          const SizedBox(height: 14),
+          if (matchedItems.isNotEmpty) ...[
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: matchedItems.map((item) {
+                return _IngredientChip(name: item.name);
+              }).toList(),
+            ),
+            const SizedBox(height: 16),
+          ],
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: matchedItems.isEmpty ? null : () => onCookNow(recipe),
+              icon: const Icon(Icons.restaurant_menu_rounded, size: 18),
+              label: const Text(
+                'Cook Now',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF7C3AED),
+                disabledBackgroundColor: const Color(0xFFE5E7EB),
+                foregroundColor: Colors.white,
+                disabledForegroundColor: const Color(0xFF9CA3AF),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
             ),
           ),
@@ -119,49 +143,49 @@ class _ErrorCard extends StatelessWidget {
   }
 }
 
-class _InfoBanner extends StatelessWidget {
-  final int count;
+class _IngredientChip extends StatelessWidget {
+  final String name;
 
-  const _InfoBanner({required this.count});
+  const _IngredientChip({required this.name});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         color: const Color(0xFFF3E8FF),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE9D5FF)),
+        borderRadius: BorderRadius.circular(99),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: const Color(0xFF7C3AED),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(
-              Icons.auto_awesome_rounded,
-              color: Colors.white,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Gemini found $count suggestion${count == 1 ? '' : 's'} for you. Tap one recipe to view full details.',
-              style: const TextStyle(
-                color: Color(0xFF6B21A8),
-                fontSize: 13,
-                height: 1.35,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
+      child: Text(
+        name,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          color: Color(0xFF7C3AED),
+        ),
+      ),
+    );
+  }
+}
+
+class _IconBox extends StatelessWidget {
+  const _IconBox();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF7C3AED), Color(0xFFA855F7)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: const Icon(
+        Icons.auto_awesome_rounded,
+        color: Colors.white,
+        size: 21,
       ),
     );
   }
