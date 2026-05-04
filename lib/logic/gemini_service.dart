@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import '../models/inventory_item.dart';
 
 class GeminiService {
-  static const String _apiKey = 'AIzaSyB8PxcSBmP3pLR1Si6ICw-anAofPmYWAyQ';
+  static const String _apiKey = 'AIzaSyDYsfEhBVSmMEBCym_DKwWUPX_jahO_vhg';
 
   static const String _baseUrl =
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
@@ -129,8 +129,17 @@ $inventoryText
       debugPrint('GEMINI STATUS: ${response.statusCode}');
       debugPrint('GEMINI BODY: ${response.body}');
 
+      if (response.statusCode == 429) {
+        final seconds = _extractRetrySeconds(response.body);
+        return 'Gemini quota limit reached. Please wait $seconds seconds before generating again.';
+      }
+
+      if (response.statusCode == 403) {
+        return 'Gemini API key problem. Please check your API key.';
+      }
+
       if (response.statusCode != 200) {
-        return 'Failed to generate AI suggestion. Please try again later.';
+        return 'Gemini failed to generate. Please try again later.';
       }
 
       final data = jsonDecode(response.body);
@@ -145,6 +154,24 @@ $inventoryText
       debugPrint('GEMINI ERROR: $e');
       return 'Something went wrong while generating AI suggestion.';
     }
+  }
+
+  int _extractRetrySeconds(String body) {
+    try {
+      final data = jsonDecode(body);
+      final details = data['error']?['details'];
+
+      if (details is List) {
+        for (final item in details) {
+          final retryDelay = item['retryDelay'];
+          if (retryDelay is String && retryDelay.endsWith('s')) {
+            return int.tryParse(retryDelay.replaceAll('s', '')) ?? 60;
+          }
+        }
+      }
+    } catch (_) {}
+
+    return 60;
   }
 
   String _cleanText(String text) {

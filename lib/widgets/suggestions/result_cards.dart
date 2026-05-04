@@ -4,19 +4,21 @@ import '../../models/inventory_item.dart';
 import '../../screens/suggestions/recipe_detail_page.dart';
 
 class ResultCards extends StatelessWidget {
-  final List<Map<String, String>> recipes;
+  final List<Map<String, String>> results;
   final List<InventoryItem> inventoryItems;
-  final Future<void> Function(List<InventoryItem>) onCookRecipe;
+  final bool isRecipeResult;
+  final Future<void> Function(List<InventoryItem>)? onCookRecipe;
 
   const ResultCards({
     super.key,
-    required this.recipes,
+    required this.results,
     required this.inventoryItems,
+    required this.isRecipeResult,
     required this.onCookRecipe,
   });
 
-  List<InventoryItem> _matchedItems(Map<String, String> recipe) {
-    final text = '${recipe['title'] ?? ''} ${recipe['content'] ?? ''}'
+  List<InventoryItem> _matchedItems(Map<String, String> result) {
+    final text = '${result['title'] ?? ''} ${result['content'] ?? ''}'
         .toLowerCase();
 
     return inventoryItems.where((item) {
@@ -29,8 +31,8 @@ class ResultCards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      children: recipes.map((recipe) {
-        final matched = _matchedItems(recipe);
+      children: results.map((result) {
+        final matched = _matchedItems(result);
 
         return Container(
           width: double.infinity,
@@ -46,11 +48,11 @@ class ResultCards extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const _IconBox(),
+                  _IconBox(isRecipe: isRecipeResult),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      recipe['title'] ?? 'AI Suggestion',
+                      result['title'] ?? 'AI Suggestion',
                       style: const TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w900,
@@ -62,9 +64,11 @@ class ResultCards extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               Text(
-                recipe['content'] ?? '',
-                maxLines: 5,
-                overflow: TextOverflow.ellipsis,
+                result['content'] ?? '',
+                maxLines: isRecipeResult ? 5 : null,
+                overflow: isRecipeResult
+                    ? TextOverflow.ellipsis
+                    : TextOverflow.visible,
                 style: const TextStyle(
                   fontSize: 13.5,
                   height: 1.45,
@@ -73,7 +77,8 @@ class ResultCards extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 14),
-              if (matched.isNotEmpty) ...[
+
+              if (isRecipeResult && matched.isNotEmpty) ...[
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -83,37 +88,44 @@ class ResultCards extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
               ],
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => RecipeDetailPage(
-                          recipe: recipe,
-                          matchedItems: matched,
-                          onCook: onCookRecipe,
+
+              if (isRecipeResult)
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      if (onCookRecipe == null) return;
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => RecipeDetailPage(
+                            recipe: result,
+                            matchedItems: matched,
+                            onCook: onCookRecipe!,
+                          ),
                         ),
+                      );
+                    },
+                    icon: const Icon(Icons.visibility_rounded, size: 18),
+                    label: const Text(
+                      'View Recipe',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.visibility_rounded, size: 18),
-                  label: const Text(
-                    'View Recipe',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF7C3AED),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF7C3AED),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
         );
@@ -148,7 +160,9 @@ class _IngredientChip extends StatelessWidget {
 }
 
 class _IconBox extends StatelessWidget {
-  const _IconBox();
+  final bool isRecipe;
+
+  const _IconBox({required this.isRecipe});
 
   @override
   Widget build(BuildContext context) {
@@ -161,8 +175,10 @@ class _IconBox extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: const Icon(
-        Icons.auto_awesome_rounded,
+      child: Icon(
+        isRecipe
+            ? Icons.auto_awesome_rounded
+            : Icons.shopping_cart_checkout_rounded,
         color: Colors.white,
         size: 21,
       ),

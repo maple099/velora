@@ -10,24 +10,42 @@ class SuggestionPageTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
       children: [
-        Text(
-          'AI Suggestions',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFF111827),
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'AI Suggestions',
+                style: TextStyle(
+                  fontSize: 25,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF111827),
+                ),
+              ),
+              SizedBox(height: 5),
+              Text(
+                'Smart ideas to manage your inventory',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF6B7280),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
         ),
-        SizedBox(height: 4),
-        Text(
-          'Smart recipes & restock advice',
-          style: TextStyle(
-            fontSize: 14,
-            color: Color(0xFF6B7280),
-            fontWeight: FontWeight.w600,
+        Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF3E8FF),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Icon(
+            Icons.auto_awesome_rounded,
+            color: Color(0xFF7C3AED),
           ),
         ),
       ],
@@ -52,8 +70,8 @@ class SuggestionActionButtons extends StatelessWidget {
         Expanded(
           child: ActionCard(
             title: 'Generate Recipes',
-            subtitle: 'Reduce food waste',
-            icon: Icons.restaurant,
+            subtitle: 'AI recipe ideas',
+            icon: Icons.restaurant_rounded,
             isPrimary: true,
             onTap: onRecipeTap,
           ),
@@ -62,8 +80,8 @@ class SuggestionActionButtons extends StatelessWidget {
         Expanded(
           child: ActionCard(
             title: 'Restock Advice',
-            subtitle: 'Smart stock tips',
-            icon: Icons.shopping_cart,
+            subtitle: 'What to buy',
+            icon: Icons.shopping_cart_rounded,
             isPrimary: false,
             onTap: onRestockTap,
           ),
@@ -118,7 +136,7 @@ class SuggestionSectionTitle extends StatelessWidget {
     return Text(
       title,
       style: const TextStyle(
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: FontWeight.w900,
         color: Color(0xFF111827),
       ),
