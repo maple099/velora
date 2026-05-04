@@ -1,45 +1,52 @@
 import 'package:flutter/material.dart';
 
+import '../../screens/suggestions/recipe_detail_page.dart';
+import 'recipe_result_tile.dart';
+
 class ResultCards extends StatelessWidget {
   final List<Map<String, String>> recipes;
 
   const ResultCards({super.key, required this.recipes});
 
+  String _previewText(String content) {
+    final clean = content
+        .replaceAll('*', '')
+        .replaceAll('#', '')
+        .replaceAll('-', '')
+        .trim();
+
+    final lines = clean
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .toList();
+
+    if (lines.isEmpty) return 'Tap to view this AI suggestion.';
+
+    return lines.first.length > 80
+        ? '${lines.first.substring(0, 80)}...'
+        : lines.first;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: recipes.map((recipe) {
-        return Container(
-          width: double.infinity,
-          margin: const EdgeInsets.only(bottom: 14),
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: const Color(0xFFE5E7EB)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                recipe['title'] ?? 'AI Suggestion',
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF7C3AED),
-                ),
+        final title = recipe['title'] ?? 'AI Suggestion';
+        final content = recipe['content'] ?? '';
+
+        return RecipeResultTile(
+          title: title,
+          subtitle: _previewText(content),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    RecipeDetailPage(title: title, content: content),
               ),
-              const SizedBox(height: 10),
-              Text(
-                recipe['content'] ?? '',
-                style: const TextStyle(
-                  fontSize: 14,
-                  height: 1.5,
-                  color: Color(0xFF374151),
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       }).toList(),
     );
