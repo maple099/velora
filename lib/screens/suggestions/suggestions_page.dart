@@ -31,7 +31,6 @@ class SuggestionsPage extends StatelessWidget {
           final docs = snapshot.data!.docs;
           final now = DateTime.now();
 
-          // 🔥 Get near expiry items
           final nearExpiryItems = docs.where((doc) {
             final data = doc.data() as Map<String, dynamic>;
             final expiry = data['expiryDate'];
@@ -40,6 +39,7 @@ class SuggestionsPage extends StatelessWidget {
               final diff = expiry.toDate().difference(now).inDays;
               return diff >= 0 && diff <= 4;
             }
+
             return false;
           }).toList();
 
@@ -70,35 +70,65 @@ class SuggestionsPage extends StatelessWidget {
     );
   }
 
-  // 🧠 SIMPLE AI LOGIC
-  List<String> _generateSuggestions(List<String> items) {
-    final List<String> results = [];
+  List<RecipeSuggestion> _generateSuggestions(List<String> items) {
+    final List<RecipeSuggestion> results = [];
 
     if (items.contains('bread') && items.contains('egg')) {
-      results.add('Make Sandwich 🥪');
-      results.add('Make French Toast 🍞');
+      results.add(
+        const RecipeSuggestion(
+          title: 'Make Sandwich 🥪',
+          reason: 'Because you have bread and egg expiring soon.',
+        ),
+      );
+
+      results.add(
+        const RecipeSuggestion(
+          title: 'Make French Toast 🍞',
+          reason: 'Because bread and egg can be used before they expire.',
+        ),
+      );
     }
 
     if (items.contains('rice') && items.contains('egg')) {
-      results.add('Make Fried Rice 🍚');
+      results.add(
+        const RecipeSuggestion(
+          title: 'Make Fried Rice 🍚',
+          reason: 'Because rice and egg are available near expiry.',
+        ),
+      );
     }
 
     if (items.contains('chicken')) {
-      results.add('Cook Grilled Chicken 🍗');
+      results.add(
+        const RecipeSuggestion(
+          title: 'Cook Grilled Chicken 🍗',
+          reason: 'Because chicken should be used before expiry.',
+        ),
+      );
     }
 
     if (items.contains('milk')) {
-      results.add('Make Pancakes 🥞');
+      results.add(
+        const RecipeSuggestion(
+          title: 'Make Pancakes 🥞',
+          reason: 'Because milk can be used for a simple recipe.',
+        ),
+      );
     }
 
     if (items.contains('banana')) {
-      results.add('Make Banana Smoothie 🍌');
+      results.add(
+        const RecipeSuggestion(
+          title: 'Make Banana Smoothie 🍌',
+          reason: 'Because banana is near expiry and can be blended quickly.',
+        ),
+      );
     }
 
     return results;
   }
 
-  Widget _suggestionCard(String text) {
+  Widget _suggestionCard(RecipeSuggestion suggestion) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
@@ -120,16 +150,38 @@ class SuggestionsPage extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                color: textDark,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  suggestion.title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: textDark,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  suggestion.reason,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: textGrey,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
+}
+
+class RecipeSuggestion {
+  final String title;
+  final String reason;
+
+  const RecipeSuggestion({required this.title, required this.reason});
 }

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../core/utils/expiry_helper.dart';
 import '../../logic/firestore_service.dart';
 import '../../models/inventory_item.dart';
-import 'item_details_page.dart';
+import 'widgets/inventory_card.dart';
 
 class InventoryPage extends StatefulWidget {
   const InventoryPage({super.key});
@@ -36,7 +37,7 @@ class _InventoryPageState extends State<InventoryPage> {
       }
 
       if (selectedFilter == 'Near Expiry') {
-        final daysLeft = item.expiryDate.difference(DateTime.now()).inDays;
+        final daysLeft = ExpiryHelper.daysLeft(item.expiryDate);
         return matchSearch && daysLeft >= 0 && daysLeft <= 4;
       }
 
@@ -48,7 +49,6 @@ class _InventoryPageState extends State<InventoryPage> {
     if (query.isEmpty) return true;
 
     final normalized = text.toLowerCase().trim();
-
     if (normalized.startsWith(query)) return true;
 
     final words = normalized.split(RegExp(r'\s+'));
@@ -96,56 +96,61 @@ class _InventoryPageState extends State<InventoryPage> {
               const SizedBox(height: 14),
               _filters(),
               const SizedBox(height: 16),
-              StreamBuilder<List<InventoryItem>>(
-                stream: FirestoreService.instance.getItems(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Padding(
-                      padding: EdgeInsets.only(top: 60),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-
-                  if (snapshot.hasError) {
-                    return const Padding(
-                      padding: EdgeInsets.only(top: 40),
-                      child: Center(child: Text('Something went wrong')),
-                    );
-                  }
-
-                  final items = snapshot.data ?? [];
-                  final filteredItems = _filterItems(items);
-
-                  if (filteredItems.isEmpty) {
-                    return const Padding(
-                      padding: EdgeInsets.only(top: 40),
-                      child: Center(
-                        child: Text(
-                          'No items found',
-                          style: TextStyle(
-                            color: Color(0xFF6B7280),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-
-                  return Column(
-                    children: filteredItems.map((item) {
-                      return _InventoryCard(
-                        item: item,
-                        icon: _iconForCategory(item.category),
-                        expiryText: _formatDate(item.expiryDate),
-                      );
-                    }).toList(),
-                  );
-                },
-              ),
+              _inventoryList(),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _inventoryList() {
+    return StreamBuilder<List<InventoryItem>>(
+      stream: FirestoreService.instance.getItems(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.only(top: 60),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return const Padding(
+            padding: EdgeInsets.only(top: 40),
+            child: Center(child: Text('Something went wrong')),
+          );
+        }
+
+        final items = snapshot.data ?? [];
+        final filteredItems = _filterItems(items);
+
+        if (filteredItems.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.only(top: 40),
+            child: Center(
+              child: Text(
+                'No items found',
+                style: TextStyle(
+                  color: Color(0xFF6B7280),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          );
+        }
+
+        return Column(
+          children: filteredItems.map((item) {
+            return InventoryCard(
+              item: item,
+              icon: _iconForCategory(item.category),
+              expiryText: _formatDate(item.expiryDate),
+              daysLeftText: ExpiryHelper.daysLeftText(item.expiryDate),
+            );
+          }).toList(),
+        );
+      },
     );
   }
 
@@ -251,96 +256,6 @@ class _InventoryPageState extends State<InventoryPage> {
           ),
         );
       }).toList(),
-    );
-  }
-}
-
-class _InventoryCard extends StatelessWidget {
-  final InventoryItem item;
-  final IconData icon;
-  final String expiryText;
-
-  const _InventoryCard({
-    required this.item,
-    required this.icon,
-    required this.expiryText,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => ItemDetailsPage(item: item)),
-        );
-      },
-      child: Container(
-        height: 92,
-        margin: const EdgeInsets.only(bottom: 13),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 14,
-              offset: const Offset(0, 7),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 58,
-              height: 58,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF3E8FF),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(icon, size: 30, color: const Color(0xFF7C3AED)),
-            ),
-            const SizedBox(width: 13),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF111827),
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    '${item.category} • Qty: ${item.quantity}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF374151),
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    'Expiry: $expiryText',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF6B7280),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right_rounded, color: Color(0xFF6B7280)),
-          ],
-        ),
-      ),
     );
   }
 }
