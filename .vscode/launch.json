@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Velora (Chrome with Gemini)",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "chrome",
+      "toolArgs": [
+        "--dart-define=GEMINI_API_KEY=AIzaSyAlc4cEJQ3Uu6C7vmESGar1QVIzjO0VZpA"
+      ]
+    }
+  ]
+}
