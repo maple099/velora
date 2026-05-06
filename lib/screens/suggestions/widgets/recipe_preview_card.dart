@@ -4,12 +4,14 @@ class RecipePreviewCard extends StatelessWidget {
   final String title;
   final String content;
   final VoidCallback onTap;
+  final String? badgeText;
 
   const RecipePreviewCard({
     super.key,
     required this.title,
     required this.content,
     required this.onTap,
+    this.badgeText,
   });
 
   String get preview {
@@ -85,6 +87,27 @@ class RecipePreviewCard extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    if (badgeText != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFECFDF5),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          badgeText!,
+                          style: const TextStyle(
+                            color: Color(0xFF059669),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

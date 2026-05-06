@@ -3,24 +3,18 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../../logic/ai_cache_service.dart';
 import '../../logic/ai_generate_service.dart';
 import '../../logic/ai_inventory_checker.dart';
 import '../../logic/ai_quota_service.dart';
+import '../../logic/ai_recipe_save_service.dart';
 import '../../logic/ai_reset_helper.dart';
-import '../../logic/cook_now_service.dart';
 import '../../logic/gemini_service.dart';
 import '../../logic/suggestion_helper.dart';
 import '../../models/inventory_item.dart';
-import '../../widgets/suggestions/cache_notice.dart';
-import '../../widgets/suggestions/empty_card.dart';
-import '../../widgets/suggestions/inventory_changed_card.dart';
-import '../../widgets/suggestions/premium_loading_card.dart';
 import '../../widgets/suggestions/quota_status_card.dart';
-import '../../widgets/suggestions/result_cards.dart';
 import '../../widgets/suggestions/suggestion_sections.dart';
-import 'recipe_detail_page.dart';
-import 'utils/recipe_parser.dart';
-import 'widgets/recipe_preview_card.dart';
+import 'widgets/suggestion_ai_result.dart';
 
 class SuggestionsPage extends StatefulWidget {
   const SuggestionsPage({super.key});
@@ -31,10 +25,11 @@ class SuggestionsPage extends StatefulWidget {
 
 class _SuggestionsPageState extends State<SuggestionsPage> {
   final GeminiService _gemini = GeminiService();
-  final CookNowService _cookNowService = CookNowService();
   final AiQuotaService _quotaService = AiQuotaService();
   final AiGenerateService _aiService = AiGenerateService();
+  final AiCacheService _cacheService = AiCacheService();
   final AiInventoryChecker _inventoryChecker = AiInventoryChecker();
+  final AiRecipeSaveService _recipeSaveService = AiRecipeSaveService();
   final SuggestionHelper _helper = SuggestionHelper();
 
   bool _isLoading = false;
@@ -53,6 +48,7 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
   String _resultSignature = '';
   String _resetCountdown = '';
   String _resetTimeText = '';
+  String _geminiStatus = 'Ready';
 
   @override
   void initState() {
@@ -74,12 +70,15 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
 
   Future<void> _loadQuota() async {
     final used = await _quotaService.getUsedToday();
+
     if (!mounted) return;
+
     setState(() => _usedQuota = used);
   }
 
   void _updateResetCountdown() {
     final data = AiResetHelper.getResetInfo();
+
     if (!mounted) return;
 
     setState(() {
@@ -90,20 +89,19 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
 
   Future<void> _autoLoadCache(List<InventoryItem> items) async {
     if (_didAutoLoad) return;
+
     _didAutoLoad = true;
 
-    final data = await _aiService.generate(
+    final cached = await _cacheService.getCachedResult(
       type: 'recipes_v2',
       items: items,
-      fetcher: () => _gemini.generateRecipeSuggestions(items),
     );
 
-    if (!mounted) return;
-    if (data['isError'] == true || data['isCached'] != true) return;
+    if (!mounted || cached == null || cached.isEmpty) return;
 
     setState(() {
-      _resultText = data['result'] ?? '';
-      _resultSignature = data['signature'] ?? '';
+      _resultText = cached;
+      _resultSignature = _cacheService.buildCurrentSignature(items);
       _isCached = true;
       _isRecipeResult = true;
       _inventoryChanged = false;
@@ -151,7 +149,11 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
       return;
     }
 
-    setState(() => _isRecipeResult = isRecipe);
+    setState(() {
+      _isRecipeResult = isRecipe;
+      _geminiStatus = 'Checking';
+    });
+
     await _generateAiResult(type: type, items: items, fetcher: fetcher);
   }
 
@@ -164,7 +166,6 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
       _isLoading = true;
       _isCached = false;
       _inventoryChanged = false;
-      _resultText = '';
     });
 
     final data = await _aiService.generate(
@@ -178,35 +179,64 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
     final result = data['result'] ?? '';
 
     if (data['isError'] == true || _isErrorResult(result)) {
-      final retrySeconds = _extractSeconds(result);
-      if (retrySeconds > 0) _startCooldown(retrySeconds);
-
-      setState(() {
-        _resultText = result;
-        _resultSignature = '';
-        _isCached = false;
-        _isLoading = false;
-      });
+      _handleAiError(result);
       return;
     }
 
     await _loadQuota();
 
+    final isCachedResult = data['isCached'] ?? false;
+
+    if (type == 'recipes_v2' && isCachedResult == false) {
+      await _saveGeneratedRecipes(result, items);
+    }
+
+    if (!mounted) return;
+
     setState(() {
       _resultText = result;
       _resultSignature = data['signature'] ?? '';
-      _isCached = data['isCached'] ?? false;
+      _isCached = isCachedResult;
       _isLoading = false;
+      _geminiStatus = isCachedResult ? 'Using cache' : 'Available';
     });
   }
 
-  Future<void> _cookRecipe(List<InventoryItem> usedItems) async {
-    try {
-      await _cookNowService.cookRecipe(usedItems);
-      _showSnack('Ingredients marked as used.');
-    } catch (_) {
-      _showSnack('Failed to cook recipe.');
+  void _handleAiError(String result) {
+    final retrySeconds = _extractSeconds(result);
+
+    if (retrySeconds > 0) {
+      _startCooldown(retrySeconds);
     }
+
+    setState(() {
+      _resultText = result;
+      _resultSignature = '';
+      _isCached = false;
+      _isLoading = false;
+      _geminiStatus = _statusFromError(result);
+    });
+  }
+
+  Future<void> _saveGeneratedRecipes(
+    String result,
+    List<InventoryItem> items,
+  ) async {
+    final recipes = _helper.parseRecipes(result);
+
+    final savedCount = await _recipeSaveService.saveGeneratedRecipes(
+      recipes: recipes,
+      items: items,
+      rawResult: result,
+    );
+
+    if (savedCount <= 0) return;
+
+    final message = savedCount == 1
+        ? 'New AI recipe saved for later.'
+        : '$savedCount new AI recipes saved for later.';
+
+    _showSnack(message);
   }
 
   void _startCooldown(int seconds) {
@@ -216,11 +246,17 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
     _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_cooldownSeconds <= 1) {
         timer.cancel();
-        if (mounted) setState(() => _cooldownSeconds = 0);
+
+        if (mounted) {
+          setState(() => _cooldownSeconds = 0);
+        }
+
         return;
       }
 
-      if (mounted) setState(() => _cooldownSeconds--);
+      if (mounted) {
+        setState(() => _cooldownSeconds--);
+      }
     });
   }
 
@@ -240,80 +276,21 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
         lower.contains('no ai suggestion');
   }
 
+  String _statusFromError(String text) {
+    final lower = text.toLowerCase();
+
+    if (lower.contains('quota')) return 'Quota limited';
+    if (lower.contains('api key')) return 'API key error';
+    if (lower.contains('network')) return 'Network error';
+
+    return 'Temporary error';
+  }
+
   void _showSnack(String message) {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-    );
-  }
-
-  void _openRecipeDetail(
-    Map<String, String> recipe,
-    List<InventoryItem> items,
-  ) {
-    final content = RecipeParser.content(recipe);
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => RecipeDetailPage(
-          title: RecipeParser.title(recipe),
-          ingredients: RecipeParser.ingredients(content),
-          steps: RecipeParser.steps(content),
-          nearExpiryIngredients: RecipeParser.nearExpiryNames(items),
-          whyRecommended: RecipeParser.why(content),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRecipeCards(List<InventoryItem> items) {
-    final recipes = _helper.parseRecipes(_resultText);
-
-    if (recipes.isEmpty) {
-      return EmptyCard(text: _resultText);
-    }
-
-    return Column(
-      children: recipes.map((recipe) {
-        return RecipePreviewCard(
-          title: RecipeParser.title(recipe),
-          content: RecipeParser.content(recipe),
-          onTap: () => _openRecipeDetail(recipe, items),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildAiResult(List<InventoryItem> items) {
-    if (_isLoading) return const PremiumLoadingCard();
-
-    if (_resultText.isEmpty) {
-      return const EmptyCard(
-        text: 'AI will suggest recipes automatically when available.',
-      );
-    }
-
-    if (_isErrorResult(_resultText)) {
-      return EmptyCard(text: _resultText);
-    }
-
-    return Column(
-      children: [
-        if (_isCached) const CacheNotice(),
-        if (_inventoryChanged && _isRecipeResult)
-          InventoryChangedCard(onRegenerate: () => _generateRecipes(items)),
-        if (_isRecipeResult)
-          _buildRecipeCards(items)
-        else
-          ResultCards(
-            results: _helper.parseRecipes(_resultText),
-            inventoryItems: items,
-            isRecipeResult: false,
-            onCookRecipe: null,
-          ),
-      ],
     );
   }
 
@@ -355,6 +332,7 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
                     cooldownSeconds: _cooldownSeconds,
                     resetCountdown: _resetCountdown,
                     resetTimeText: _resetTimeText,
+                    geminiStatus: _geminiStatus,
                   ),
                   const SizedBox(height: 18),
                   SuggestionActionButtons(
@@ -373,7 +351,17 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
                     title: _isRecipeResult ? 'AI Recipes' : 'Restock Advice',
                   ),
                   const SizedBox(height: 12),
-                  _buildAiResult(items),
+                  SuggestionAiResult(
+                    isLoading: _isLoading,
+                    isRecipeResult: _isRecipeResult,
+                    isCached: _isCached,
+                    inventoryChanged: _inventoryChanged,
+                    resultText: _resultText,
+                    items: items,
+                    helper: _helper,
+                    recipeSaveService: _recipeSaveService,
+                    onRegenerate: () => _generateRecipes(items),
+                  ),
                 ],
               ),
             );

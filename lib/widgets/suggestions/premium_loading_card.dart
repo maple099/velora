@@ -10,6 +10,7 @@ class PremiumLoadingCard extends StatefulWidget {
 class _PremiumLoadingCardState extends State<PremiumLoadingCard>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
+  late final Animation<double> _pulse;
 
   @override
   void initState() {
@@ -17,8 +18,13 @@ class _PremiumLoadingCardState extends State<PremiumLoadingCard>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 1300),
     )..repeat(reverse: true);
+
+    _pulse = Tween<double>(
+      begin: 0.94,
+      end: 1.08,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -31,66 +37,79 @@ class _PremiumLoadingCardState extends State<PremiumLoadingCard>
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.fromLTRB(22, 24, 22, 22),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF7C3AED), Color(0xFFA855F7)],
+          colors: [Color(0xFF6D28D9), Color(0xFF7C3AED), Color(0xFFA855F7)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF7C3AED).withOpacity(0.25),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
+            color: const Color(0xFF7C3AED).withValues(alpha: 0.28),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
       child: Column(
         children: [
           ScaleTransition(
-            scale: Tween<double>(begin: 0.92, end: 1.08).animate(
-              CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-            ),
+            scale: _pulse,
             child: Container(
-              width: 74,
-              height: 74,
+              height: 78,
+              width: 78,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.18),
+                color: Colors.white.withValues(alpha: 0.16),
                 shape: BoxShape.circle,
+                border: Border.all(color: Colors.white.withValues(alpha: 0.30)),
               ),
               child: const Icon(
                 Icons.auto_awesome_rounded,
                 color: Colors.white,
-                size: 36,
+                size: 38,
               ),
             ),
           ),
           const SizedBox(height: 18),
           const Text(
             'Generating Recipes',
+            textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white,
-              fontSize: 20,
+              fontSize: 21,
               fontWeight: FontWeight.w900,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'AI is cooking up smart ideas for you ✨',
+          Text(
+            'Gemini is checking your inventory and preparing smart recipe ideas.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Color(0xFFF3E8FF),
-              fontSize: 14,
+              color: Colors.white.withValues(alpha: 0.88),
+              fontSize: 13,
+              height: 1.45,
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 20),
           ClipRRect(
-            borderRadius: BorderRadius.circular(99),
+            borderRadius: BorderRadius.circular(999),
             child: LinearProgressIndicator(
               minHeight: 7,
-              backgroundColor: Colors.white.withOpacity(0.22),
+              backgroundColor: Colors.white.withValues(alpha: 0.22),
               valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'This may use your Gemini API quota.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.72),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
