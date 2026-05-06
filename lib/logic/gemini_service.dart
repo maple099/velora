@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import '../models/inventory_item.dart';
 
 class GeminiService {
-  static const String _apiKey = 'AIzaSyALbpLBV0vCGIXnnyuLDGR_BUayMop91YI';
+  static const String _apiKey = 'AIzaSyAVlv3Aj3QwviSh_IdGNaPyRG4eF2VjKcA';
 
   static const String _baseUrl =
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
@@ -16,26 +16,44 @@ class GeminiService {
       return 'No inventory items found. Please add items first.';
     }
 
-    final inventoryText = items
-        .map((item) {
-          final expiry = item.expiryDate.toIso8601String().split('T').first;
-          return '- ${item.name}, quantity: ${item.quantity}, expiry: $expiry';
-        })
-        .join('\n');
+    final usableItems = items.where((item) => !_isExpired(item)).toList();
+
+    if (usableItems.isEmpty) {
+      return 'No safe recipe can be suggested because all inventory items are expired.';
+    }
+
+    final inventoryText = _buildInventoryText(usableItems);
+    final nearExpiryText = _buildNearExpiryText(usableItems);
+    final expiredText = _buildExpiredText(items);
 
     final prompt =
         """
-You are a professional chef.
+You are Velora AI, a recipe assistant for an F&B inventory mobile app.
 
-Generate EXACTLY 3 real, specific recipes using ONLY the available inventory items below.
+Your task:
+Generate MAXIMUM 3 recipe suggestions using ONLY the usable inventory items below.
 
-IMPORTANT RULES:
-- Use real, specific dish names.
+Usable inventory:
+$inventoryText
+
+Near-expiry items to prioritize:
+$nearExpiryText
+
+Expired items excluded:
+$expiredText
+
+VERY IMPORTANT RULES:
+- Suggest maximum 3 recipes only.
+- Use ONLY ingredients from the usable inventory list.
+- Do NOT use expired items.
+- Do NOT add ingredients that are not in usable inventory.
+- Prioritize near-expiry items first.
+- Each recipe must use at least 1 near-expiry item if possible.
 - Do not use generic names like Quick Meal, Simple Dish, Mixed Meal, or Basic Recipe.
+- Use real and specific dish names.
+- Keep recipes simple and realistic for F&B stock usage.
+- Keep output short to save API quota.
 - Do not use markdown symbols like *, **, #, or backticks.
-- Do not suggest ingredients that are not in the inventory list.
-- Keep steps clear like a cooking tutorial.
-- Each recipe must be realistic and easy to cook.
 
 FORMAT EXACTLY LIKE THIS:
 
@@ -54,9 +72,6 @@ Steps:
 
 Why:
 This recipe helps use Chicken and Egg before they expire.
-
-Available inventory:
-$inventoryText
 """;
 
     return _sendPrompt(prompt);
@@ -69,43 +84,125 @@ $inventoryText
       return 'No inventory items found. Please add items first.';
     }
 
-    final inventoryText = items
-        .map((item) {
-          final expiry = item.expiryDate.toIso8601String().split('T').first;
-          return '- ${item.name}, quantity: ${item.quantity}, expiry: $expiry';
-        })
-        .join('\n');
+    final usableItems = items.where((item) => !_isExpired(item)).toList();
+
+    final inventoryText = _buildInventoryText(usableItems);
+    final nearExpiryText = _buildNearExpiryText(usableItems);
+    final expiredText = _buildExpiredText(items);
 
     final prompt =
         """
-You are an inventory assistant for a small F&B business.
+You are Velora AI, an inventory assistant for a small F&B business.
 
 Give smart restock recommendations based on the inventory below.
 
-IMPORTANT RULES:
-- Do not use markdown symbols like *, **, #, or backticks.
-- Keep advice simple and practical.
-- Mention low stock items.
-- Mention items that may expire soon.
-- Suggest what should be restocked first.
+Usable inventory:
+$inventoryText
 
-FORMAT:
+Near-expiry items:
+$nearExpiryText
+
+Expired items:
+$expiredText
+
+IMPORTANT RULES:
+- Keep advice short and practical.
+- Mention low stock usable items first.
+- Mention near-expiry items that should be used soon.
+- Mention expired items as items to remove or restock.
+- Do not suggest using expired items in recipes.
+- Do not use markdown symbols like *, **, #, or backticks.
+- Keep output short to save API quota.
+
+FORMAT EXACTLY LIKE THIS:
 
 ### Restock Priority
 
 Items to restock:
-- item name: reason
+- item name: short reason
+
+Still need to use soon:
+- item name: short reason
+
+Expired stock to remove:
+- item name: short reason
 
 Advice:
-1. Clear advice
-2. Clear advice
-3. Clear advice
-
-Inventory:
-$inventoryText
+1. Clear advice.
+2. Clear advice.
+3. Clear advice.
 """;
 
     return _sendPrompt(prompt);
+  }
+
+  String _buildInventoryText(List<InventoryItem> items) {
+    if (items.isEmpty) {
+      return 'No usable inventory items found.';
+    }
+
+    return items
+        .map((item) {
+          final expiry = item.expiryDate.toIso8601String().split('T').first;
+          final daysLeft = _daysLeft(item);
+
+          return '- ${item.name}, quantity: ${item.quantity}, expiry: $expiry, days left: $daysLeft';
+        })
+        .join('\n');
+  }
+
+  String _buildNearExpiryText(List<InventoryItem> items) {
+    final nearExpiry = items.where((item) {
+      final daysLeft = _daysLeft(item);
+      return daysLeft >= 0 && daysLeft <= 3;
+    }).toList();
+
+    if (nearExpiry.isEmpty) {
+      return 'No near-expiry usable items found.';
+    }
+
+    return nearExpiry
+        .map((item) {
+          final expiry = item.expiryDate.toIso8601String().split('T').first;
+          final daysLeft = _daysLeft(item);
+
+          return '- ${item.name}, expiry: $expiry, days left: $daysLeft';
+        })
+        .join('\n');
+  }
+
+  String _buildExpiredText(List<InventoryItem> items) {
+    final expired = items.where(_isExpired).toList();
+
+    if (expired.isEmpty) {
+      return 'No expired items found.';
+    }
+
+    return expired
+        .map((item) {
+          final expiry = item.expiryDate.toIso8601String().split('T').first;
+          final daysLeft = _daysLeft(item);
+
+          return '- ${item.name}, expiry: $expiry, days left: $daysLeft';
+        })
+        .join('\n');
+  }
+
+  int _daysLeft(InventoryItem item) {
+    final today = DateTime.now();
+    final todayOnly = DateTime(today.year, today.month, today.day);
+
+    final expiryOnly = DateTime(
+      item.expiryDate.year,
+      item.expiryDate.month,
+      item.expiryDate.day,
+    );
+
+    return expiryOnly.difference(todayOnly).inDays;
+  }
+
+  bool _isExpired(InventoryItem item) {
+    return _daysLeft(item) < 0;
   }
 
   Future<String> _sendPrompt(String prompt) async {
@@ -123,6 +220,7 @@ $inventoryText
               ],
             },
           ],
+          'generationConfig': {'temperature': 0.7, 'maxOutputTokens': 900},
         }),
       );
 
@@ -131,6 +229,7 @@ $inventoryText
 
       if (response.statusCode == 429) {
         final seconds = _extractRetrySeconds(response.body);
+
         return 'Gemini quota limit reached. Please wait $seconds seconds before generating again.';
       }
 
@@ -152,6 +251,7 @@ $inventoryText
       return _cleanText(text.toString());
     } catch (e) {
       debugPrint('GEMINI ERROR: $e');
+
       return 'Something went wrong while generating AI suggestion.';
     }
   }
@@ -164,6 +264,7 @@ $inventoryText
       if (details is List) {
         for (final item in details) {
           final retryDelay = item['retryDelay'];
+
           if (retryDelay is String && retryDelay.endsWith('s')) {
             return int.tryParse(retryDelay.replaceAll('s', '')) ?? 60;
           }
