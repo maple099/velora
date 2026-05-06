@@ -1,188 +1,141 @@
 import 'package:flutter/material.dart';
 
-import '../../models/inventory_item.dart';
-import '../../widgets/suggestions/cook_now_sheet.dart';
-
 class RecipeDetailPage extends StatelessWidget {
-  final Map<String, String> recipe;
-  final List<InventoryItem> matchedItems;
-  final Future<void> Function(List<InventoryItem>) onCook;
+  final String title;
+  final List<String> ingredients;
+  final List<String> steps;
+  final List<String> nearExpiryIngredients;
+  final String whyRecommended;
 
   const RecipeDetailPage({
     super.key,
-    required this.recipe,
-    required this.matchedItems,
-    required this.onCook,
+    required this.title,
+    required this.ingredients,
+    required this.steps,
+    required this.nearExpiryIngredients,
+    required this.whyRecommended,
   });
+
+  bool _isNearExpiry(String ingredient) {
+    return nearExpiryIngredients.any(
+      (item) => item.toLowerCase().trim() == ingredient.toLowerCase().trim(),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final title = recipe['title'] ?? 'Recipe Detail';
-    final content = recipe['content'] ?? '';
+    final isSmall = MediaQuery.of(context).size.width < 370;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 110),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _TopBar(title: title),
-              const SizedBox(height: 18),
-              _HeroCard(title: title),
-              const SizedBox(height: 18),
-              _InfoCard(
-                title: 'Recipe Tutorial',
-                icon: Icons.menu_book_rounded,
-                child: Text(
-                  content,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    height: 1.55,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF4B5563),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              _InfoCard(
-                title: 'Ingredients from Inventory',
-                icon: Icons.inventory_2_rounded,
-                child: matchedItems.isEmpty
-                    ? const Text(
-                        'No matching inventory ingredients found.',
-                        style: TextStyle(
-                          color: Color(0xFFEF4444),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      )
-                    : Column(
-                        children: matchedItems
-                            .map((item) => _IngredientTile(item: item))
-                            .toList(),
-                      ),
-              ),
-              const SizedBox(height: 22),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton.icon(
-                  onPressed: matchedItems.isEmpty
-                      ? null
-                      : () {
-                          showModalBottomSheet(
-                            context: context,
-                            backgroundColor: Colors.transparent,
-                            builder: (_) {
-                              return CookNowSheet(
-                                recipeTitle: title,
-                                matchedItems: matchedItems,
-                                onConfirm: () async {
-                                  Navigator.pop(context);
-                                  await onCook(matchedItems);
-                                  if (context.mounted) Navigator.pop(context);
-                                },
-                              );
-                            },
-                          );
-                        },
-                  icon: const Icon(Icons.restaurant_menu_rounded),
-                  label: const Text(
-                    'Cook Now',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF7C3AED),
-                    disabledBackgroundColor: const Color(0xFFE5E7EB),
-                    foregroundColor: Colors.white,
-                    disabledForegroundColor: const Color(0xFF9CA3AF),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF8FAFC),
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Color(0xFF111827)),
+        title: const Text(
+          'Recipe Details',
+          style: TextStyle(
+            color: Color(0xFF111827),
+            fontWeight: FontWeight.w900,
           ),
         ),
       ),
-    );
-  }
-}
-
-class _TopBar extends StatelessWidget {
-  final String title;
-
-  const _TopBar({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back_rounded),
+      body: ListView(
+        padding: EdgeInsets.fromLTRB(
+          isSmall ? 16 : 20,
+          8,
+          isSmall ? 16 : 20,
+          28,
         ),
-        const SizedBox(width: 4),
-        Expanded(
-          child: Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              color: Color(0xFF111827),
+        children: [
+          _HeroCard(title: title, isSmall: isSmall),
+          const SizedBox(height: 18),
+          _SectionCard(
+            title: 'Ingredients',
+            icon: Icons.restaurant_menu_rounded,
+            child: Column(
+              children: ingredients.map((ingredient) {
+                return _IngredientRow(
+                  name: ingredient,
+                  isNearExpiry: _isNearExpiry(ingredient),
+                );
+              }).toList(),
             ),
           ),
-        ),
-      ],
+          const SizedBox(height: 18),
+          _SectionCard(
+            title: 'Cooking Steps',
+            icon: Icons.list_alt_rounded,
+            child: Column(
+              children: List.generate(steps.length, (index) {
+                return _StepRow(number: index + 1, text: steps[index]);
+              }),
+            ),
+          ),
+          const SizedBox(height: 18),
+          _WhyCard(text: whyRecommended),
+        ],
+      ),
     );
   }
 }
 
 class _HeroCard extends StatelessWidget {
   final String title;
+  final bool isSmall;
 
-  const _HeroCard({required this.title});
+  const _HeroCard({required this.title, required this.isSmall});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isSmall ? 18 : 22),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF7C3AED), Color(0xFFA855F7)],
         ),
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF7C3AED).withValues(alpha: 0.24),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 54,
-            height: 54,
+            height: isSmall ? 58 : 66,
+            width: isSmall ? 58 : 66,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.18),
-              borderRadius: BorderRadius.circular(18),
+              color: Colors.white.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(22),
             ),
             child: const Icon(
               Icons.auto_awesome_rounded,
               color: Colors.white,
-              size: 28,
+              size: 32,
             ),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-              ),
+          const SizedBox(height: 18),
+          Text(
+            title,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: isSmall ? 22 : 26,
+              fontWeight: FontWeight.w900,
+              height: 1.15,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'AI recipe suggestion based on your inventory',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.86),
+              fontSize: isSmall ? 12 : 13,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -191,12 +144,12 @@ class _HeroCard extends StatelessWidget {
   }
 }
 
-class _InfoCard extends StatelessWidget {
+class _SectionCard extends StatelessWidget {
   final String title;
   final IconData icon;
   final Widget child;
 
-  const _InfoCard({
+  const _SectionCard({
     required this.title,
     required this.icon,
     required this.child,
@@ -205,26 +158,39 @@ class _InfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 7),
+          ),
+        ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, color: const Color(0xFF7C3AED), size: 20),
-              const SizedBox(width: 8),
+              Container(
+                height: 38,
+                width: 38,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3E8FF),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: const Color(0xFF7C3AED), size: 21),
+              ),
+              const SizedBox(width: 12),
               Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
                   color: Color(0xFF111827),
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
             ],
@@ -237,49 +203,143 @@ class _InfoCard extends StatelessWidget {
   }
 }
 
-class _IngredientTile extends StatelessWidget {
-  final InventoryItem item;
+class _IngredientRow extends StatelessWidget {
+  final String name;
+  final bool isNearExpiry;
 
-  const _IngredientTile({required this.item});
+  const _IngredientRow({required this.name, required this.isNearExpiry});
 
   @override
   Widget build(BuildContext context) {
-    final days = item.expiryDate.difference(DateTime.now()).inDays;
-    final isNear = days <= 7;
-
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-        color: isNear ? const Color(0xFFFFF7ED) : const Color(0xFFF9FAFB),
+        color: isNearExpiry ? const Color(0xFFFFFBEB) : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isNear ? const Color(0xFFFED7AA) : const Color(0xFFE5E7EB),
+          color: isNearExpiry
+              ? const Color(0xFFFDE68A)
+              : const Color(0xFFE5E7EB),
         ),
       ),
       child: Row(
         children: [
           Icon(
-            isNear ? Icons.warning_amber_rounded : Icons.check_circle_rounded,
-            color: isNear ? const Color(0xFFF97316) : const Color(0xFF10B981),
-            size: 19,
+            isNearExpiry
+                ? Icons.warning_amber_rounded
+                : Icons.check_circle_rounded,
+            color: isNearExpiry
+                ? const Color(0xFFF59E0B)
+                : const Color(0xFF10B981),
+            size: 21,
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              item.name,
+              name,
               style: const TextStyle(
+                color: Color(0xFF111827),
                 fontWeight: FontWeight.w800,
-                color: Color(0xFF374151),
               ),
             ),
           ),
-          Text(
-            isNear ? 'Near expiry' : 'Available',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              color: isNear ? const Color(0xFFF97316) : const Color(0xFF10B981),
+          if (isNearExpiry)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF3C4),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: const Text(
+                'Near Expiry ⚠️',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFFB45309),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepRow extends StatelessWidget {
+  final int number;
+  final String text;
+
+  const _StepRow({required this.number, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 13),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            height: 30,
+            width: 30,
+            decoration: BoxDecoration(
+              color: const Color(0xFF7C3AED),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Center(
+              child: Text(
+                number.toString(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Color(0xFF374151),
+                fontWeight: FontWeight.w600,
+                height: 1.45,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WhyCard extends StatelessWidget {
+  final String text;
+
+  const _WhyCard({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFECFDF5),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFA7F3D0)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.lightbulb_rounded, color: Color(0xFF10B981)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Color(0xFF065F46),
+                fontWeight: FontWeight.w700,
+                height: 1.45,
+              ),
             ),
           ),
         ],

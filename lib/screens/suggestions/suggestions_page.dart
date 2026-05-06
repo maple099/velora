@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 
 import '../../logic/ai_generate_service.dart';
 import '../../logic/ai_inventory_checker.dart';
@@ -11,7 +11,6 @@ import '../../logic/cook_now_service.dart';
 import '../../logic/gemini_service.dart';
 import '../../logic/suggestion_helper.dart';
 import '../../models/inventory_item.dart';
-
 import '../../widgets/suggestions/cache_notice.dart';
 import '../../widgets/suggestions/empty_card.dart';
 import '../../widgets/suggestions/inventory_changed_card.dart';
@@ -19,6 +18,9 @@ import '../../widgets/suggestions/premium_loading_card.dart';
 import '../../widgets/suggestions/quota_status_card.dart';
 import '../../widgets/suggestions/result_cards.dart';
 import '../../widgets/suggestions/suggestion_sections.dart';
+import 'recipe_detail_page.dart';
+import 'utils/recipe_parser.dart';
+import 'widgets/recipe_preview_card.dart';
 
 class SuggestionsPage extends StatefulWidget {
   const SuggestionsPage({super.key});
@@ -73,13 +75,11 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
   Future<void> _loadQuota() async {
     final used = await _quotaService.getUsedToday();
     if (!mounted) return;
-
     setState(() => _usedQuota = used);
   }
 
   void _updateResetCountdown() {
     final data = AiResetHelper.getResetInfo();
-
     if (!mounted) return;
 
     setState(() {
@@ -99,7 +99,6 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
     );
 
     if (!mounted) return;
-
     if (data['isError'] == true || data['isCached'] != true) return;
 
     setState(() {
@@ -153,7 +152,6 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
     }
 
     setState(() => _isRecipeResult = isRecipe);
-
     await _generateAiResult(type: type, items: items, fetcher: fetcher);
   }
 
@@ -181,10 +179,7 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
 
     if (data['isError'] == true || _isErrorResult(result)) {
       final retrySeconds = _extractSeconds(result);
-
-      if (retrySeconds > 0) {
-        _startCooldown(retrySeconds);
-      }
+      if (retrySeconds > 0) _startCooldown(retrySeconds);
 
       setState(() {
         _resultText = result;
@@ -209,14 +204,13 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
     try {
       await _cookNowService.cookRecipe(usedItems);
       _showSnack('Ingredients marked as used.');
-    } catch (e) {
+    } catch (_) {
       _showSnack('Failed to cook recipe.');
     }
   }
 
   void _startCooldown(int seconds) {
     _cooldownTimer?.cancel();
-
     setState(() => _cooldownSeconds = seconds);
 
     _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -254,6 +248,44 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
     );
   }
 
+  void _openRecipeDetail(
+    Map<String, String> recipe,
+    List<InventoryItem> items,
+  ) {
+    final content = RecipeParser.content(recipe);
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RecipeDetailPage(
+          title: RecipeParser.title(recipe),
+          ingredients: RecipeParser.ingredients(content),
+          steps: RecipeParser.steps(content),
+          nearExpiryIngredients: RecipeParser.nearExpiryNames(items),
+          whyRecommended: RecipeParser.why(content),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecipeCards(List<InventoryItem> items) {
+    final recipes = _helper.parseRecipes(_resultText);
+
+    if (recipes.isEmpty) {
+      return EmptyCard(text: _resultText);
+    }
+
+    return Column(
+      children: recipes.map((recipe) {
+        return RecipePreviewCard(
+          title: RecipeParser.title(recipe),
+          content: RecipeParser.content(recipe),
+          onTap: () => _openRecipeDetail(recipe, items),
+        );
+      }).toList(),
+    );
+  }
+
   Widget _buildAiResult(List<InventoryItem> items) {
     if (_isLoading) return const PremiumLoadingCard();
 
@@ -272,12 +304,15 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
         if (_isCached) const CacheNotice(),
         if (_inventoryChanged && _isRecipeResult)
           InventoryChangedCard(onRegenerate: () => _generateRecipes(items)),
-        ResultCards(
-          results: _helper.parseRecipes(_resultText),
-          inventoryItems: items,
-          isRecipeResult: _isRecipeResult,
-          onCookRecipe: _isRecipeResult ? _cookRecipe : null,
-        ),
+        if (_isRecipeResult)
+          _buildRecipeCards(items)
+        else
+          ResultCards(
+            results: _helper.parseRecipes(_resultText),
+            inventoryItems: items,
+            isRecipeResult: false,
+            onCookRecipe: null,
+          ),
       ],
     );
   }
@@ -313,7 +348,6 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
                 children: [
                   const SuggestionPageTitle(),
                   const SizedBox(height: 18),
-
                   QuotaStatusCard(
                     used: _usedQuota,
                     limit: AiQuotaService.dailyLimit,
@@ -322,31 +356,23 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
                     resetCountdown: _resetCountdown,
                     resetTimeText: _resetTimeText,
                   ),
-
                   const SizedBox(height: 18),
-
                   SuggestionActionButtons(
                     onRecipeTap: () => _generateRecipes(items),
                     onRestockTap: () => _generateRestock(items),
                   ),
-
                   const SizedBox(height: 26),
-
                   const SuggestionSectionTitle(title: 'Near Expiry Items'),
                   const SizedBox(height: 12),
-
                   NearExpirySection(
                     nearExpiry: nearExpiry,
                     daysLeftText: _helper.daysLeftText,
                   ),
-
                   const SizedBox(height: 26),
-
                   SuggestionSectionTitle(
                     title: _isRecipeResult ? 'AI Recipes' : 'Restock Advice',
                   ),
                   const SizedBox(height: 12),
-
                   _buildAiResult(items),
                 ],
               ),
