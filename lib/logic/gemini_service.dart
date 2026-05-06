@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import '../models/inventory_item.dart';
 
 class GeminiService {
-  static const String _apiKey = 'AIzaSyDYsfEhBVSmMEBCym_DKwWUPX_jahO_vhg';
+  static const String _apiKey = 'AIzaSyALbpLBV0vCGIXnnyuLDGR_BUayMop91YI';
 
   static const String _baseUrl =
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
