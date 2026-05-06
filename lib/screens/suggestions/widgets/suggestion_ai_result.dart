@@ -43,6 +43,8 @@ class SuggestionAiResult extends StatelessWidget {
 
     return lower.contains('failed') ||
         lower.contains('quota') ||
+        lower.contains('rate limit') ||
+        lower.contains('429') ||
         lower.contains('api key') ||
         lower.contains('try again') ||
         lower.contains('something went wrong') ||
@@ -103,8 +105,8 @@ class SuggestionAiResult extends StatelessWidget {
     );
   }
 
-  Widget _buildFallbackCard(BuildContext context) {
-    final fallback = FallbackRecipeBuilder.build(items);
+  Widget _buildFallbackRecipeCard(BuildContext context) {
+    final fallback = FallbackRecipeBuilder.buildRecipe(items);
 
     if (fallback == null) {
       return const EmptyCard(
@@ -120,6 +122,10 @@ class SuggestionAiResult extends StatelessWidget {
     );
   }
 
+  Widget _buildRestockFallback() {
+    return EmptyCard(text: FallbackRecipeBuilder.buildRestockText(items));
+  }
+
   Widget _buildSavedOrFallback(BuildContext context, {String? notice}) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: recipeSaveService.savedRecipesStream(),
@@ -133,10 +139,10 @@ class SuggestionAiResult extends StatelessWidget {
               EmptyCard(
                 text:
                     notice ??
-                    'No saved AI recipes yet. Showing demo fallback recipe.',
+                    'No saved AI recipes yet. Showing demo-safe recipe.',
               ),
               const SizedBox(height: 12),
-              _buildFallbackCard(context),
+              _buildFallbackRecipeCard(context),
             ],
           );
         }
@@ -171,15 +177,20 @@ class SuggestionAiResult extends StatelessWidget {
       return _buildSavedOrFallback(context);
     }
 
+    if (!isRecipeResult && resultText.isEmpty) {
+      return _buildRestockFallback();
+    }
+
     if (_isErrorResult(resultText)) {
       if (isRecipeResult) {
         return _buildSavedOrFallback(
           context,
-          notice: 'Gemini quota limit reached. Showing saved or demo recipes.',
+          notice:
+              'Gemini quota limit reached. Showing demo-safe suggestions based on your inventory.',
         );
       }
 
-      return EmptyCard(text: resultText);
+      return _buildRestockFallback();
     }
 
     return Column(

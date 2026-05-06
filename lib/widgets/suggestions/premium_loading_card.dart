@@ -74,7 +74,7 @@ class _PremiumLoadingCardState extends State<PremiumLoadingCard>
           ),
           const SizedBox(height: 18),
           const Text(
-            'Generating Recipes',
+            'Generating Suggestions',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white,
@@ -84,7 +84,7 @@ class _PremiumLoadingCardState extends State<PremiumLoadingCard>
           ),
           const SizedBox(height: 8),
           Text(
-            'Gemini is checking your inventory and preparing smart recipe ideas.',
+            'Gemini is checking your inventory and preparing smart ideas.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.88),

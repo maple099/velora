@@ -1,13 +1,8 @@
 import '../../../models/inventory_item.dart';
 
 class FallbackRecipeBuilder {
-  static Map<String, dynamic>? build(List<InventoryItem> items) {
-    final names = items
-        .map((item) => item.name.trim())
-        .where((name) => name.isNotEmpty)
-        .toSet()
-        .take(3)
-        .toList();
+  static Map<String, dynamic>? buildRecipe(List<InventoryItem> items) {
+    final names = _inventoryNames(items).take(3).toList();
 
     if (names.isEmpty) return null;
 
@@ -15,7 +10,7 @@ class FallbackRecipeBuilder {
 
     return {
       'title': title,
-      'content': _content(title, names),
+      'content': _recipeContent(title, names),
       'ingredients': names,
       'steps': [
         'Wash and prepare the ingredients.',
@@ -26,11 +21,42 @@ class FallbackRecipeBuilder {
       ],
       'nearExpiryIngredients': names,
       'whyRecommended':
-          'This fallback recipe uses available inventory items when Gemini quota is limited.',
+          'This demo-safe recipe only uses items available in your inventory.',
     };
   }
 
-  static String _content(String title, List<String> names) {
+  static String buildRestockText(List<InventoryItem> items) {
+    final names = _inventoryNames(items);
+
+    if (names.isEmpty) {
+      return 'Add inventory items first to get restock suggestions.';
+    }
+
+    final shown = names.take(5).join(', ');
+
+    return '''
+Gemini quota limit reached. Showing demo-safe restock suggestions based on your inventory.
+
+Restock Suggestions:
+- Review your current stock: $shown.
+- Restock items that are used often.
+- Check quantity before buying more.
+- Prioritize items needed for upcoming recipes.
+- Avoid overbuying to reduce food waste.
+
+This fallback does not use ingredients outside your inventory.
+''';
+  }
+
+  static List<String> _inventoryNames(List<InventoryItem> items) {
+    return items
+        .map((item) => item.name.trim())
+        .where((name) => name.isNotEmpty)
+        .toSet()
+        .toList();
+  }
+
+  static String _recipeContent(String title, List<String> names) {
     return '''
 $title
 
@@ -45,7 +71,7 @@ Steps:
 5. Serve while hot.
 
 Why:
-This recipe helps use available inventory items while Gemini quota is limited.
+This recipe helps use available inventory items when Gemini quota is limited.
 ''';
   }
 
