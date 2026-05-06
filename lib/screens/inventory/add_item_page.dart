@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 
+import 'package:image_picker/image_picker.dart';
 import '../../logic/firestore_service.dart';
 import '../../models/inventory_item.dart';
 
@@ -19,6 +21,9 @@ class _AddItemPageState extends State<AddItemPage> {
   String selectedUnit = 'kg';
   DateTime? selectedDate;
   bool isSaving = false;
+  File? selectedImage;
+
+  final ImagePicker picker = ImagePicker();
 
   final categories = ['Meat', 'Dairy', 'Vegetable', 'Fruit', 'Bakery', 'Other'];
   final units = ['kg', 'g', 'L', 'ml', 'pcs'];
@@ -44,6 +49,19 @@ class _AddItemPageState extends State<AddItemPage> {
     }
   }
 
+  Future<void> _pickImage() async {
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 70,
+    );
+
+    if (picked != null) {
+      setState(() {
+        selectedImage = File(picked.path);
+      });
+    }
+  }
+
   Future<void> _saveItem() async {
     if (itemNameController.text.trim().isEmpty ||
         quantityController.text.trim().isEmpty ||
@@ -65,7 +83,7 @@ class _AddItemPageState extends State<AddItemPage> {
       category: selectedCategory,
       quantity: int.tryParse(quantityController.text.trim()) ?? 0,
       expiryDate: selectedDate!,
-      imageUrl: '',
+      imageUrl: selectedImage?.path ?? '',
       createdAt: DateTime.now(),
     );
 
@@ -190,51 +208,65 @@ class _AddItemPageState extends State<AddItemPage> {
   }
 
   Widget _imageUploadBox() {
-    return Container(
-      height: 145,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 14,
-            offset: const Offset(0, 7),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF3E8FF),
-              borderRadius: BorderRadius.circular(16),
+    return InkWell(
+      onTap: _pickImage,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        height: 170,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 14,
+              offset: const Offset(0, 7),
             ),
-            child: const Icon(
-              Icons.add_a_photo_outlined,
-              color: Color(0xFF7C3AED),
-            ),
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'Upload Image',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF374151),
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Optional',
-            style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
-          ),
-        ],
+          ],
+        ),
+
+        child: selectedImage != null
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Image.file(
+                  selectedImage!,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                ),
+              )
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3E8FF),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(
+                      Icons.add_a_photo_outlined,
+                      color: Color(0xFF7C3AED),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Upload Food Image',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF374151),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Tap to choose from gallery',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+                  ),
+                ],
+              ),
       ),
     );
   }
