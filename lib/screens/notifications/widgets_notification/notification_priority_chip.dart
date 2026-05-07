@@ -11,10 +11,8 @@ class NotificationPriorityChip extends StatelessWidget {
     switch (priority) {
       case AlertPriority.high:
         return const Color(0xFFEF4444);
-
       case AlertPriority.medium:
         return const Color(0xFFF59E0B);
-
       case AlertPriority.low:
         return const Color(0xFF10B981);
     }
@@ -24,10 +22,8 @@ class NotificationPriorityChip extends StatelessWidget {
     switch (priority) {
       case AlertPriority.high:
         return 'High';
-
       case AlertPriority.medium:
         return 'Medium';
-
       case AlertPriority.low:
         return 'Low';
     }
@@ -37,10 +33,8 @@ class NotificationPriorityChip extends StatelessWidget {
     switch (priority) {
       case AlertPriority.high:
         return Icons.priority_high_rounded;
-
       case AlertPriority.medium:
         return Icons.remove_rounded;
-
       case AlertPriority.low:
         return Icons.keyboard_arrow_down_rounded;
     }
@@ -59,9 +53,7 @@ class NotificationPriorityChip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 12, color: color),
-
           const SizedBox(width: 3),
-
           Text(
             text,
             style: TextStyle(

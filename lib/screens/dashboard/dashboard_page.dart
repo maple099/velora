@@ -1,11 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../home/widgets_home/notification_bell.dart';
+import '../home/widgets_home/recent_activity_card.dart';
 import '../inventory/add_item/add_item_page.dart';
 import '../inventory/inventory_page.dart';
 import '../notifications/notification_page.dart';
 import '../suggestions/suggestions_page.dart';
-import '../home/widgets_home/recent_activity_card.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -31,10 +32,7 @@ class DashboardPage extends StatelessWidget {
 
       if (expiryRaw is Timestamp) {
         final days = _daysLeft(expiryRaw.toDate());
-
-        if (days >= 0 && days <= 4) {
-          count++;
-        }
+        if (days >= 0 && days <= 4) count++;
       }
     }
 
@@ -48,9 +46,7 @@ class DashboardPage extends StatelessWidget {
       final data = doc.data() as Map<String, dynamic>;
       final quantity = data['quantity'] ?? 0;
 
-      if (quantity <= 2) {
-        count++;
-      }
+      if (quantity <= 2) count++;
     }
 
     return count;
@@ -75,7 +71,6 @@ class DashboardPage extends StatelessWidget {
             }
 
             final docs = snapshot.data!.docs;
-
             final totalItems = docs.length;
             final nearExpiry = _nearExpiryCount(docs);
             final lowStock = _lowStockCount(docs);
@@ -83,18 +78,10 @@ class DashboardPage extends StatelessWidget {
             return ListView(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
               children: [
-                _DashboardHeader(
-                  onNotificationTap: () {
-                    _goTo(context, const NotificationPage());
-                  },
-                ),
-
+                const _DashboardHeader(),
                 const SizedBox(height: 18),
-
                 _HeroCard(totalItems: totalItems),
-
                 const SizedBox(height: 18),
-
                 Row(
                   children: [
                     Expanded(
@@ -105,9 +92,7 @@ class DashboardPage extends StatelessWidget {
                         color: orange,
                       ),
                     ),
-
                     const SizedBox(width: 12),
-
                     Expanded(
                       child: _MetricCard(
                         title: 'Low Stock',
@@ -118,26 +103,15 @@ class DashboardPage extends StatelessWidget {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 18),
-
                 _QuickActions(
-                  onAddTap: () {
-                    _goTo(context, const AddItemPage());
-                  },
-                  onInventoryTap: () {
-                    _goTo(context, const InventoryPage());
-                  },
-                  onSuggestionTap: () {
-                    _goTo(context, const SuggestionsPage());
-                  },
-                  onAlertTap: () {
-                    _goTo(context, const NotificationPage());
-                  },
+                  onAddTap: () => _goTo(context, const AddItemPage()),
+                  onInventoryTap: () => _goTo(context, const InventoryPage()),
+                  onSuggestionTap: () =>
+                      _goTo(context, const SuggestionsPage()),
+                  onAlertTap: () => _goTo(context, const NotificationPage()),
                 ),
-
                 const SizedBox(height: 18),
-
                 const RecentActivityCard(),
               ],
             );
@@ -149,15 +123,13 @@ class DashboardPage extends StatelessWidget {
 }
 
 class _DashboardHeader extends StatelessWidget {
-  final VoidCallback onNotificationTap;
-
-  const _DashboardHeader({required this.onNotificationTap});
+  const _DashboardHeader();
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return const Row(
       children: [
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -169,9 +141,7 @@ class _DashboardHeader extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-
               SizedBox(height: 4),
-
               Text(
                 'Velora Dashboard',
                 style: TextStyle(
@@ -183,24 +153,7 @@ class _DashboardHeader extends StatelessWidget {
             ],
           ),
         ),
-
-        InkWell(
-          onTap: onNotificationTap,
-          borderRadius: BorderRadius.circular(18),
-          child: Container(
-            height: 46,
-            width: 46,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-            ),
-            child: const Icon(
-              Icons.notifications_rounded,
-              color: Color(0xFF7C3AED),
-            ),
-          ),
-        ),
+        NotificationBell(),
       ],
     );
   }
@@ -239,9 +192,7 @@ class _HeroCard extends StatelessWidget {
               size: 28,
             ),
           ),
-
           const SizedBox(width: 16),
-
           Expanded(
             child: Text(
               '$totalItems item(s)\ncurrently in inventory',
@@ -296,9 +247,7 @@ class _MetricCard extends StatelessWidget {
             backgroundColor: color.withAlpha(25),
             child: Icon(icon, color: color),
           ),
-
           const SizedBox(height: 14),
-
           Text(
             value,
             style: const TextStyle(
@@ -307,9 +256,7 @@ class _MetricCard extends StatelessWidget {
               fontWeight: FontWeight.w900,
             ),
           ),
-
           const SizedBox(height: 4),
-
           Text(
             title,
             style: const TextStyle(
@@ -350,9 +297,7 @@ class _QuickActions extends StatelessWidget {
             fontWeight: FontWeight.w900,
           ),
         ),
-
         const SizedBox(height: 12),
-
         Row(
           children: [
             Expanded(
@@ -362,9 +307,7 @@ class _QuickActions extends StatelessWidget {
                 onTap: onAddTap,
               ),
             ),
-
             const SizedBox(width: 12),
-
             Expanded(
               child: _ActionButton(
                 title: 'Inventory',
@@ -374,9 +317,7 @@ class _QuickActions extends StatelessWidget {
             ),
           ],
         ),
-
         const SizedBox(height: 12),
-
         Row(
           children: [
             Expanded(
@@ -386,9 +327,7 @@ class _QuickActions extends StatelessWidget {
                 onTap: onSuggestionTap,
               ),
             ),
-
             const SizedBox(width: 12),
-
             Expanded(
               child: _ActionButton(
                 title: 'Alerts',
@@ -429,9 +368,7 @@ class _ActionButton extends StatelessWidget {
         child: Row(
           children: [
             Icon(icon, color: const Color(0xFF7C3AED)),
-
             const SizedBox(width: 10),
-
             Expanded(
               child: Text(
                 title,
@@ -444,54 +381,6 @@ class _ActionButton extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _RecentActivityPlaceholder extends StatelessWidget {
-  const _RecentActivityPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(8),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Recent Activity',
-            style: TextStyle(
-              color: Color(0xFF111827),
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-
-          SizedBox(height: 12),
-
-          Text(
-            'Your latest stock activity will appear here.',
-            style: TextStyle(
-              color: Color(0xFF6B7280),
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
       ),
     );
   }

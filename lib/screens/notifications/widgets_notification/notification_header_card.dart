@@ -50,7 +50,7 @@ class NotificationHeaderCard extends StatelessWidget {
             ),
           ),
           TextButton(
-            onPressed: onReadAll,
+            onPressed: total == 0 ? null : onReadAll,
             child: const Text(
               'Read all',
               style: TextStyle(
