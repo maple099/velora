@@ -11,7 +11,7 @@ import 'screens/auth/login_page.dart';
 import 'screens/home/home_page.dart';
 
 // INVENTORY
-import 'screens/inventory/add_item_page.dart';
+import 'screens/inventory/add_item/add_item_page.dart';
 
 // SUGGESTIONS
 import 'screens/suggestions/suggestions_page.dart';
@@ -35,21 +35,18 @@ class VeloraApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Velora',
-
       theme: ThemeData(
         fontFamily: 'Poppins',
         primarySwatch: Colors.deepPurple,
         scaffoldBackgroundColor: const Color(0xFFF8FAFC),
       ),
-
       home: const SplashPage(),
-
       routes: {
         '/login': (context) => const LoginPage(),
         '/home': (context) => const HomePage(),
         '/add-item': (context) => const AddItemPage(),
         '/suggestions': (context) => const SuggestionsPage(),
-        '/alerts': (context) => const AlertsPage(), // ✅ NOW MATCH
+        '/alerts': (context) => const AlertsPage(),
       },
     );
   }

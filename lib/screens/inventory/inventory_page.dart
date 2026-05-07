@@ -81,7 +81,6 @@ class _InventoryPageState extends State<InventoryPage> {
         elevation: 0,
         centerTitle: false,
         automaticallyImplyLeading: false,
-
         title: Text(
           'Inventory',
           style: TextStyle(

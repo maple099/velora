@@ -5,8 +5,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/inventory_item.dart';
+import '../../services/activity_service.dart';
 import 'edit_item_page.dart';
 import 'utils/expiry_helper.dart';
+import 'widgets/item_detail_action_button.dart';
+import 'widgets/item_detail_info_card.dart';
+import 'widgets/mark_as_used_dialog.dart';
 
 class ItemDetailsPage extends StatelessWidget {
   final InventoryItem item;
@@ -56,29 +60,83 @@ class ItemDetailsPage extends StatelessWidget {
   }
 
   Future<void> _deleteItem(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Item?'),
+        content: Text('Are you sure you want to delete ${item.name}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Color(0xFFEF4444)),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
     await FirebaseFirestore.instance
         .collection('inventory')
         .doc(item.id)
         .delete();
 
+    await ActivityService.addActivity(
+      type: 'item_deleted',
+      title: 'Deleted ${item.name}',
+      subtitle: 'Item removed from inventory',
+    );
+
     if (context.mounted) Navigator.pop(context);
   }
 
   Future<void> _markAsUsed(BuildContext context) async {
+    final usedAmount = await showDialog<int>(
+      context: context,
+      builder: (_) => MarkAsUsedDialog(currentQuantity: item.quantity),
+    );
+
+    if (usedAmount == null) return;
+
+    final newQuantity = item.quantity - usedAmount;
+
     await FirebaseFirestore.instance
         .collection('inventory')
         .doc(item.id)
-        .update({'quantity': 0});
+        .update({'quantity': newQuantity});
 
     await FirebaseFirestore.instance.collection('inventory_records').add({
       'itemId': item.id,
       'itemName': item.name,
       'type': 'stock_out',
-      'quantity': item.quantity,
+      'quantity': usedAmount,
+      'remainingQuantity': newQuantity,
       'createdAt': Timestamp.now(),
     });
 
-    if (context.mounted) Navigator.pop(context);
+    await ActivityService.addActivity(
+      type: 'stock_out',
+      title: '${item.name} marked as used',
+      subtitle: 'Used $usedAmount, remaining $newQuantity',
+    );
+
+    if (!context.mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${item.name} updated successfully'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+
+    Navigator.pop(context);
   }
 
   void _goToEdit(BuildContext context) {
@@ -131,12 +189,21 @@ class ItemDetailsPage extends StatelessWidget {
             isSmall: isSmall,
           ),
           const SizedBox(height: 18),
-          _InfoCard(
+          ItemDetailInfoCard(
             rows: [
-              _InfoRow(label: 'Quantity', value: item.quantity.toString()),
-              _InfoRow(label: 'Category', value: item.category),
-              _InfoRow(label: 'Expiry Date', value: _dateText(item.expiryDate)),
-              _InfoRow(label: 'Stored On', value: _dateText(item.createdAt)),
+              ItemDetailInfoRow(
+                label: 'Quantity',
+                value: item.quantity.toString(),
+              ),
+              ItemDetailInfoRow(label: 'Category', value: item.category),
+              ItemDetailInfoRow(
+                label: 'Expiry Date',
+                value: _dateText(item.expiryDate),
+              ),
+              ItemDetailInfoRow(
+                label: 'Stored On',
+                value: _dateText(item.createdAt),
+              ),
             ],
           ),
           const SizedBox(height: 18),
@@ -153,21 +220,21 @@ class ItemDetailsPage extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _ActionButton(
+            ItemDetailActionButton(
               label: 'Edit Item',
               icon: Icons.edit_rounded,
               color: const Color(0xFF7C3AED),
               onTap: () => _goToEdit(context),
             ),
             const SizedBox(height: 10),
-            _ActionButton(
+            ItemDetailActionButton(
               label: 'Mark as Used',
               icon: Icons.check_circle_rounded,
               color: const Color(0xFF10B981),
               onTap: () => _markAsUsed(context),
             ),
             const SizedBox(height: 10),
-            _ActionButton(
+            ItemDetailActionButton(
               label: 'Delete Item',
               icon: Icons.delete_rounded,
               color: const Color(0xFFEF4444),
@@ -211,13 +278,6 @@ class _HeroSection extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: const Color(0xFFE5E7EB)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.045),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
       ),
       child: Column(
         children: [
@@ -311,61 +371,6 @@ class _ImageBox extends StatelessWidget {
   }
 }
 
-class _InfoCard extends StatelessWidget {
-  final List<_InfoRow> rows;
-
-  const _InfoCard({required this.rows});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: Column(children: rows),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _InfoRow({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 15),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
-      ),
-      child: Row(
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF6B7280),
-            ),
-          ),
-          const Spacer(),
-          Text(
-            value,
-            style: const TextStyle(
-              fontWeight: FontWeight.w900,
-              color: Color(0xFF111827),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _TipsCard extends StatelessWidget {
   final String expiryText;
   final Color expiryColor;
@@ -396,42 +401,6 @@ class _TipsCard extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _ActionButton({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 52,
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: onTap,
-        icon: Icon(icon),
-        label: Text(label),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(17),
-          ),
-          textStyle: const TextStyle(fontWeight: FontWeight.w900),
-        ),
       ),
     );
   }

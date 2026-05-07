@@ -4,7 +4,7 @@ import '../dashboard/dashboard_page.dart';
 import '../inventory/inventory_page.dart';
 import '../reports/reports_page.dart';
 import '../suggestions/suggestions_page.dart';
-import '../inventory/add_item_page.dart';
+import '../inventory/add_item/add_item_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
