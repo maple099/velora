@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../widgets/dashboard/recent_activity_card.dart';
 import '../home/widgets_home/notification_bell.dart';
 import '../notifications/notification_page.dart';
+import '../../services/notification_alert_service.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -73,9 +74,12 @@ class DashboardPage extends StatelessWidget {
                 .snapshots(),
             builder: (context, snapshot) {
               final docs = snapshot.data?.docs ?? [];
-              final nearExpiry = _nearExpiryCount(docs);
-              final lowStock = _lowStockCount(docs);
-              final totalAlerts = nearExpiry + lowStock;
+
+              final nearExpiryAlerts =
+                  NotificationAlertService.getNearExpiryAlerts(docs);
+
+              final lowStockCount = _lowStockCount(docs);
+              final totalAlerts = nearExpiryAlerts.length + lowStockCount;
 
               return NotificationBell(
                 count: totalAlerts,
@@ -84,8 +88,8 @@ class DashboardPage extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                       builder: (_) => NotificationPage(
-                        nearExpiryCount: nearExpiry,
-                        lowStockCount: lowStock,
+                        nearExpiryAlerts: nearExpiryAlerts,
+                        lowStockCount: lowStockCount,
                       ),
                     ),
                   );

@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../../services/notification_alert_service.dart';
+
 class NotificationPage extends StatelessWidget {
-  final int nearExpiryCount;
+  final List<NearExpiryAlert> nearExpiryAlerts;
   final int lowStockCount;
 
   const NotificationPage({
     super.key,
-    required this.nearExpiryCount,
+    required this.nearExpiryAlerts,
     required this.lowStockCount,
   });
 
@@ -17,7 +19,7 @@ class NotificationPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = nearExpiryCount + lowStockCount;
+    final total = nearExpiryAlerts.length + lowStockCount;
 
     return Scaffold(
       backgroundColor: bg,
@@ -89,13 +91,12 @@ class NotificationPage extends StatelessWidget {
         ),
         const SizedBox(height: 14),
 
-        if (nearExpiryCount > 0)
+        for (final alert in nearExpiryAlerts)
           _notificationCard(
             icon: Icons.schedule_rounded,
             iconColor: Colors.orange,
-            title: 'Near expiry items',
-            message:
-                '$nearExpiryCount item(s) will expire soon. Check your inventory.',
+            title: 'Near expiry item',
+            message: alert.message,
           ),
 
         if (lowStockCount > 0)
