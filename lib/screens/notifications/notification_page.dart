@@ -1,292 +1,167 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-import '../../services/notification_alert_service.dart';
+import 'notification_alert_item.dart';
+import 'widgets_notification/notification_alert_card.dart';
+import 'widgets_notification/notification_empty_view.dart';
+import 'widgets_notification/notification_header_card.dart';
 
-class NotificationPage extends StatelessWidget {
-  final List<NearExpiryAlert> nearExpiryAlerts;
-  final List<LowStockAlert> lowStockAlerts;
+class NotificationPage extends StatefulWidget {
+  const NotificationPage({super.key});
 
-  const NotificationPage({
-    super.key,
-    required this.nearExpiryAlerts,
-    required this.lowStockAlerts,
-  });
+  @override
+  State<NotificationPage> createState() => _NotificationPageState();
+}
 
-  static const Color bg = Color(0xFFF8FAFC);
-  static const Color textDark = Color(0xFF111827);
-  static const Color textGrey = Color(0xFF6B7280);
-  static const Color purple = Color(0xFF7C3AED);
-  static const Color border = Color(0xFFE5E7EB);
+class _NotificationPageState extends State<NotificationPage> {
+  final Set<String> _dismissedIds = {};
+  final Set<String> _readIds = {};
+
+  int _daysLeft(DateTime expiryDate) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final expiry = DateTime(expiryDate.year, expiryDate.month, expiryDate.day);
+
+    return expiry.difference(today).inDays;
+  }
+
+  List<NotificationAlertItem> _buildAlerts(List<QueryDocumentSnapshot> docs) {
+    final alerts = <NotificationAlertItem>[];
+
+    for (final doc in docs) {
+      final data = doc.data() as Map<String, dynamic>;
+
+      final name = (data['name'] ?? 'Item').toString();
+      final quantity = data['quantity'] ?? 0;
+      final expiryRaw = data['expiryDate'];
+
+      if (expiryRaw is Timestamp) {
+        final days = _daysLeft(expiryRaw.toDate());
+
+        if (days >= 0 && days <= 4) {
+          alerts.add(
+            NotificationAlertItem(
+              id: 'expiry_${doc.id}',
+              title: days == 0
+                  ? 'Expires Today'
+                  : days == 1
+                  ? 'Expires Tomorrow'
+                  : 'Expires in $days Days',
+              message: '$name expires soon.',
+              type: AlertType.expiry,
+              priority: days <= 1 ? AlertPriority.high : AlertPriority.medium,
+            ),
+          );
+        }
+      }
+
+      if (quantity <= 0) {
+        alerts.add(
+          NotificationAlertItem(
+            id: 'stock_out_${doc.id}',
+            title: 'Out of Stock',
+            message: '$name is out of stock.',
+            type: AlertType.stock,
+            priority: AlertPriority.high,
+          ),
+        );
+      } else if (quantity <= 2) {
+        alerts.add(
+          NotificationAlertItem(
+            id: 'low_stock_${doc.id}',
+            title: 'Low Stock',
+            message: '$name is running low. Only $quantity left.',
+            type: AlertType.stock,
+            priority: AlertPriority.medium,
+          ),
+        );
+      }
+    }
+
+    return alerts.where((item) => !_dismissedIds.contains(item.id)).toList();
+  }
+
+  void _toggleRead(String id) {
+    setState(() {
+      if (_readIds.contains(id)) {
+        _readIds.remove(id);
+      } else {
+        _readIds.add(id);
+      }
+    });
+  }
+
+  void _dismiss(String id) {
+    setState(() {
+      _dismissedIds.add(id);
+    });
+  }
+
+  void _readAll(List<NotificationAlertItem> alerts) {
+    setState(() {
+      for (final alert in alerts) {
+        _readIds.add(alert.id);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final total = nearExpiryAlerts.length + lowStockAlerts.length;
-
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: const Color(0xFFF8FAFC),
         elevation: 0,
-        iconTheme: const IconThemeData(color: textDark),
         title: const Text(
           'Notifications',
-          style: TextStyle(color: textDark, fontWeight: FontWeight.w900),
+          style: TextStyle(
+            color: Color(0xFF111827),
+            fontWeight: FontWeight.w900,
+          ),
         ),
+        iconTheme: const IconThemeData(color: Color(0xFF111827)),
       ),
-      body: total == 0 ? _emptyState() : _historyList(total),
-    );
-  }
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance.collection('inventory').snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-  Widget _emptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                border: Border.all(color: border),
+          final alerts = _buildAlerts(snapshot.data!.docs);
+          final unreadCount = alerts
+              .where((item) => !_readIds.contains(item.id))
+              .length;
+
+          return Column(
+            children: [
+              NotificationHeaderCard(
+                total: alerts.length,
+                unread: unreadCount,
+                onReadAll: () => _readAll(alerts),
               ),
-              child: const Icon(
-                Icons.notifications_none_rounded,
-                color: purple,
-                size: 46,
+              Expanded(
+                child: alerts.isEmpty
+                    ? const NotificationEmptyView()
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                        itemCount: alerts.length,
+                        itemBuilder: (context, index) {
+                          final alert = alerts[index];
+
+                          return NotificationAlertCard(
+                            alert: alert,
+                            isRead: _readIds.contains(alert.id),
+                            onToggleRead: () => _toggleRead(alert.id),
+                            onDismiss: () => _dismiss(alert.id),
+                          );
+                        },
+                      ),
               ),
-            ),
-            const SizedBox(height: 18),
-            const Text(
-              'No notifications yet',
-              style: TextStyle(
-                color: textDark,
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Your food inventory looks safe for now.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: textGrey, fontSize: 13.5, height: 1.4),
-            ),
-          ],
-        ),
+            ],
+          );
+        },
       ),
     );
-  }
-
-  Widget _historyList(int total) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-      children: [
-        _summaryHeader(total),
-        const SizedBox(height: 18),
-
-        if (nearExpiryAlerts.isNotEmpty)
-          _sectionTitle(
-            icon: Icons.schedule_rounded,
-            title: 'Near Expiry Alerts',
-            count: nearExpiryAlerts.length,
-            color: Colors.orange,
-          ),
-
-        if (nearExpiryAlerts.isNotEmpty) const SizedBox(height: 12),
-
-        for (final alert in nearExpiryAlerts)
-          _notificationCard(
-            icon: Icons.schedule_rounded,
-            iconColor: Colors.orange,
-            title: _nearExpiryTitle(alert.daysLeft),
-            message: alert.message,
-          ),
-
-        if (nearExpiryAlerts.isNotEmpty && lowStockAlerts.isNotEmpty)
-          const SizedBox(height: 8),
-
-        if (lowStockAlerts.isNotEmpty)
-          _sectionTitle(
-            icon: Icons.warning_amber_rounded,
-            title: 'Low Stock Alerts',
-            count: lowStockAlerts.length,
-            color: Colors.redAccent,
-          ),
-
-        if (lowStockAlerts.isNotEmpty) const SizedBox(height: 12),
-
-        for (final alert in lowStockAlerts)
-          _notificationCard(
-            icon: Icons.warning_amber_rounded,
-            iconColor: alert.quantity <= 0 ? Colors.red : Colors.redAccent,
-            title: alert.quantity <= 0 ? 'Out of Stock' : 'Low Stock',
-            message: alert.message,
-          ),
-      ],
-    );
-  }
-
-  Widget _summaryHeader(int total) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [purple, Color(0xFFA855F7)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(
-              Icons.notifications_active_rounded,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$total active alert(s)',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Review items that need attention today.',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12.8,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _sectionTitle({
-    required IconData icon,
-    required String title,
-    required int count,
-    required Color color,
-  }) {
-    return Row(
-      children: [
-        Icon(icon, color: color, size: 20),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              color: textDark,
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
-            count.toString(),
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _notificationCard({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String message,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(icon, color: iconColor),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: textDark,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 14.5,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  message,
-                  style: const TextStyle(
-                    color: textGrey,
-                    fontSize: 12.5,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _nearExpiryTitle(int daysLeft) {
-    if (daysLeft == 0) return 'Expires Today';
-    if (daysLeft == 1) return 'Expires Tomorrow';
-    return 'Expiring Soon';
   }
 }

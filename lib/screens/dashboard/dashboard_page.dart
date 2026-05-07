@@ -1,256 +1,494 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-import '../../services/notification_alert_service.dart';
-import '../home/widgets_home/notification_bell.dart';
-import '../home/widgets_home/recent_activity_card.dart';
+import '../inventory/add_item/add_item_page.dart';
+import '../inventory/inventory_page.dart';
 import '../notifications/notification_page.dart';
+import '../suggestions/suggestions_page.dart';
+import '../home/widgets_home/recent_activity_card.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
 
-  static const Color purple = Color(0xFF7C3AED);
-  static const Color lightPurple = Color(0xFFA855F7);
-  static const Color mint = Color(0xFF10B981);
   static const Color bg = Color(0xFFF8FAFC);
-  static const Color textDark = Color(0xFF111827);
-  static const Color textGrey = Color(0xFF6B7280);
+  static const Color orange = Color(0xFFF59E0B);
+  static const Color red = Color(0xFFEF4444);
+
+  int _daysLeft(DateTime expiryDate) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final expiry = DateTime(expiryDate.year, expiryDate.month, expiryDate.day);
+
+    return expiry.difference(today).inDays;
+  }
+
+  int _nearExpiryCount(List<QueryDocumentSnapshot> docs) {
+    int count = 0;
+
+    for (final doc in docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final expiryRaw = data['expiryDate'];
+
+      if (expiryRaw is Timestamp) {
+        final days = _daysLeft(expiryRaw.toDate());
+
+        if (days >= 0 && days <= 4) {
+          count++;
+        }
+      }
+    }
+
+    return count;
+  }
+
+  int _lowStockCount(List<QueryDocumentSnapshot> docs) {
+    int count = 0;
+
+    for (final doc in docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final quantity = data['quantity'] ?? 0;
+
+      if (quantity <= 2) {
+        count++;
+      }
+    }
+
+    return count;
+  }
+
+  void _goTo(BuildContext context, Widget page) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: bg,
-      appBar: AppBar(
-        backgroundColor: bg,
-        elevation: 0,
-        title: const Text(
-          'Velora',
-          style: TextStyle(
-            color: textDark,
-            fontWeight: FontWeight.w900,
-            fontSize: 24,
-          ),
-        ),
-        actions: [
-          StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('inventory')
-                .snapshots(),
-            builder: (context, snapshot) {
-              final docs = snapshot.data?.docs ?? [];
+      body: SafeArea(
+        child: StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('inventory')
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-              final nearExpiryAlerts =
-                  NotificationAlertService.getNearExpiryAlerts(docs);
+            final docs = snapshot.data!.docs;
 
-              final lowStockAlerts = NotificationAlertService.getLowStockAlerts(
-                docs,
-              );
+            final totalItems = docs.length;
+            final nearExpiry = _nearExpiryCount(docs);
+            final lowStock = _lowStockCount(docs);
 
-              return NotificationBell(
-                count: nearExpiryAlerts.length + lowStockAlerts.length,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => NotificationPage(
-                        nearExpiryAlerts: nearExpiryAlerts,
-                        lowStockAlerts: lowStockAlerts,
-                      ),
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-        ],
-      ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('inventory').snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final docs = snapshot.data?.docs ?? [];
-
-          final nearExpiryAlerts = NotificationAlertService.getNearExpiryAlerts(
-            docs,
-          );
-
-          final lowStockAlerts = NotificationAlertService.getLowStockAlerts(
-            docs,
-          );
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
               children: [
-                _welcomeCard(),
+                _DashboardHeader(
+                  onNotificationTap: () {
+                    _goTo(context, const NotificationPage());
+                  },
+                ),
+
                 const SizedBox(height: 18),
+
+                _HeroCard(totalItems: totalItems),
+
+                const SizedBox(height: 18),
+
                 Row(
                   children: [
                     Expanded(
-                      child: _summaryCard(
-                        title: 'Total Items',
-                        value: docs.length.toString(),
-                        icon: Icons.inventory_2_outlined,
-                        color: purple,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _summaryCard(
+                      child: _MetricCard(
                         title: 'Near Expiry',
-                        value: nearExpiryAlerts.length.toString(),
-                        icon: Icons.schedule_rounded,
-                        color: Colors.orange,
+                        value: nearExpiry.toString(),
+                        icon: Icons.access_time_rounded,
+                        color: orange,
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _summaryCard(
-                        title: 'Low Stock',
-                        value: lowStockAlerts.length.toString(),
-                        icon: Icons.warning_amber_rounded,
-                        color: Colors.redAccent,
-                      ),
-                    ),
+
                     const SizedBox(width: 12),
+
                     Expanded(
-                      child: _summaryCard(
-                        title: 'AI Ready',
-                        value: 'Smart',
-                        icon: Icons.auto_awesome_rounded,
-                        color: mint,
+                      child: _MetricCard(
+                        title: 'Low Stock',
+                        value: lowStock.toString(),
+                        icon: Icons.warning_amber_rounded,
+                        color: red,
                       ),
                     ),
                   ],
                 ),
+
                 const SizedBox(height: 18),
-                _aiShortcutCard(),
+
+                _QuickActions(
+                  onAddTap: () {
+                    _goTo(context, const AddItemPage());
+                  },
+                  onInventoryTap: () {
+                    _goTo(context, const InventoryPage());
+                  },
+                  onSuggestionTap: () {
+                    _goTo(context, const SuggestionsPage());
+                  },
+                  onAlertTap: () {
+                    _goTo(context, const NotificationPage());
+                  },
+                ),
+
                 const SizedBox(height: 18),
-                const HomeRecentActivityCard(),
+
+                const RecentActivityCard(),
               ],
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
+}
 
-  Widget _welcomeCard() {
+class _DashboardHeader extends StatelessWidget {
+  final VoidCallback onNotificationTap;
+
+  const _DashboardHeader({required this.onNotificationTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Welcome Back 👋',
+                style: TextStyle(
+                  color: Color(0xFF6B7280),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+
+              SizedBox(height: 4),
+
+              Text(
+                'Velora Dashboard',
+                style: TextStyle(
+                  color: Color(0xFF111827),
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        InkWell(
+          onTap: onNotificationTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Container(
+            height: 46,
+            width: 46,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+            ),
+            child: const Icon(
+              Icons.notifications_rounded,
+              color: Color(0xFF7C3AED),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HeroCard extends StatelessWidget {
+  final int totalItems;
+
+  const _HeroCard({required this.totalItems});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [purple, lightPurple],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+          colors: [Color(0xFF7C3AED), Color(0xFFA855F7)],
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF7C3AED).withAlpha(55),
+            blurRadius: 22,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Text(
-            'Smart Food Inventory',
-            style: TextStyle(
+          const CircleAvatar(
+            radius: 28,
+            backgroundColor: Colors.white24,
+            child: Icon(
+              Icons.inventory_2_rounded,
               color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
+              size: 28,
             ),
           ),
-          SizedBox(height: 8),
-          Text(
-            'Track expiry, manage stock, and reduce food waste with AI help.',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 13.5,
-              height: 1.4,
+
+          const SizedBox(width: 16),
+
+          Expanded(
+            child: Text(
+              '$totalItems item(s)\ncurrently in inventory',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                height: 1.35,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _summaryCard({
-    required String title,
-    required String value,
-    required IconData icon,
-    required Color color,
-  }) {
+class _MetricCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  const _MetricCard({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(8),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 26),
+          CircleAvatar(
+            radius: 22,
+            backgroundColor: color.withAlpha(25),
+            child: Icon(icon, color: color),
+          ),
+
           const SizedBox(height: 14),
+
           Text(
             value,
             style: const TextStyle(
-              color: textDark,
-              fontSize: 22,
+              color: Color(0xFF111827),
+              fontSize: 24,
               fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 3),
+
+          const SizedBox(height: 4),
+
           Text(
             title,
             style: const TextStyle(
-              color: textGrey,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
+              color: Color(0xFF6B7280),
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _aiShortcutCard() {
+class _QuickActions extends StatelessWidget {
+  final VoidCallback onAddTap;
+  final VoidCallback onInventoryTap;
+  final VoidCallback onSuggestionTap;
+  final VoidCallback onAlertTap;
+
+  const _QuickActions({
+    required this.onAddTap,
+    required this.onInventoryTap,
+    required this.onSuggestionTap,
+    required this.onAlertTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Quick Actions',
+          style: TextStyle(
+            color: Color(0xFF111827),
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        Row(
+          children: [
+            Expanded(
+              child: _ActionButton(
+                title: 'Add Item',
+                icon: Icons.add_rounded,
+                onTap: onAddTap,
+              ),
+            ),
+
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: _ActionButton(
+                title: 'Inventory',
+                icon: Icons.inventory_rounded,
+                onTap: onInventoryTap,
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 12),
+
+        Row(
+          children: [
+            Expanded(
+              child: _ActionButton(
+                title: 'AI Suggestion',
+                icon: Icons.auto_awesome_rounded,
+                onTap: onSuggestionTap,
+              ),
+            ),
+
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: _ActionButton(
+                title: 'Alerts',
+                icon: Icons.notifications_rounded,
+                onTap: onAlertTap,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _ActionButton({
+    required this.title,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: const Color(0xFF7C3AED)),
+
+            const SizedBox(width: 10),
+
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  color: Color(0xFF111827),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RecentActivityPlaceholder extends StatelessWidget {
+  const _RecentActivityPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(8),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
-      child: const Row(
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.auto_awesome_rounded, color: purple, size: 28),
-          SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Need recipe ideas?',
-                  style: TextStyle(
-                    color: textDark,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Use near-expiry items first with AI suggestions.',
-                  style: TextStyle(color: textGrey, fontSize: 12.5),
-                ),
-              ],
+          Text(
+            'Recent Activity',
+            style: TextStyle(
+              color: Color(0xFF111827),
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+
+          SizedBox(height: 12),
+
+          Text(
+            'Your latest stock activity will appear here.',
+            style: TextStyle(
+              color: Color(0xFF6B7280),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
