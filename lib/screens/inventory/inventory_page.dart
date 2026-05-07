@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import '../../models/inventory_item.dart';
 import 'item_details_page.dart';
 import 'utils/inventory_sort_helper.dart';
-import 'widgets/inventory_card.dart';
-import 'widgets/inventory_empty_state.dart';
-import 'widgets/inventory_filter_chips.dart';
-import 'widgets/inventory_header_summary.dart';
-import 'widgets/inventory_search_bar.dart';
+import 'widgets_inventory/inventory_card.dart';
+import 'widgets_inventory/inventory_empty_state.dart';
+import 'widgets_inventory/inventory_filter_chips.dart';
+import 'widgets_inventory/inventory_header_summary.dart';
+import 'widgets_inventory/inventory_search_bar.dart';
 
 class InventoryPage extends StatefulWidget {
   const InventoryPage({super.key});

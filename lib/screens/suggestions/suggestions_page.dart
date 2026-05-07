@@ -14,7 +14,7 @@ import '../../logic/suggestion_helper.dart';
 import '../../models/inventory_item.dart';
 import '../../widgets/suggestions/quota_status_card.dart';
 import '../../widgets/suggestions/suggestion_sections.dart';
-import 'widgets/suggestion_ai_result.dart';
+import 'widgets_suggestions/suggestion_ai_result.dart';
 
 class SuggestionsPage extends StatefulWidget {
   const SuggestionsPage({super.key});

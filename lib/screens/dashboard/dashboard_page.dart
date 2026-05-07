@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../widgets/dashboard/recent_activity_card.dart';
+import '../home/widgets_home/notification_bell.dart';
+import '../notifications/notification_page.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -65,13 +67,32 @@ class DashboardPage extends StatelessWidget {
           ),
         ),
         actions: [
-          IconButton(
-            onPressed: () {
-              // Later: open Notifications page
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('inventory')
+                .snapshots(),
+            builder: (context, snapshot) {
+              final docs = snapshot.data?.docs ?? [];
+              final nearExpiry = _nearExpiryCount(docs);
+              final lowStock = _lowStockCount(docs);
+              final totalAlerts = nearExpiry + lowStock;
+
+              return NotificationBell(
+                count: totalAlerts,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => NotificationPage(
+                        nearExpiryCount: nearExpiry,
+                        lowStockCount: lowStock,
+                      ),
+                    ),
+                  );
+                },
+              );
             },
-            icon: const Icon(Icons.notifications_none_rounded, color: textDark),
           ),
-          const SizedBox(width: 8),
         ],
       ),
       body: StreamBuilder<QuerySnapshot>(

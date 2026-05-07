@@ -8,9 +8,9 @@ import '../../models/inventory_item.dart';
 import '../../services/activity_service.dart';
 import 'edit_item_page.dart';
 import 'utils/expiry_helper.dart';
-import 'widgets/item_detail_action_button.dart';
-import 'widgets/item_detail_info_card.dart';
-import 'widgets/mark_as_used_dialog.dart';
+import 'widgets_inventory/item_detail_action_button.dart';
+import 'widgets_inventory/item_detail_info_card.dart';
+import 'widgets_inventory/mark_as_used_dialog.dart';
 
 class ItemDetailsPage extends StatelessWidget {
   final InventoryItem item;

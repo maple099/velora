@@ -7,12 +7,12 @@ import '../../../logic/firestore_service.dart';
 import '../../../models/inventory_item.dart';
 import '../../../services/activity_service.dart';
 
-import 'widgets/add_item_date_box.dart';
-import 'widgets/add_item_dropdown.dart';
-import 'widgets/add_item_header.dart';
-import 'widgets/add_item_image_box.dart';
-import 'widgets/add_item_save_button.dart';
-import 'widgets/add_item_text_field.dart';
+import 'widgets_add/add_item_date_box.dart';
+import 'widgets_add/add_item_dropdown.dart';
+import 'widgets_add/add_item_header.dart';
+import 'widgets_add/add_item_image_box.dart';
+import 'widgets_add/add_item_save_button.dart';
+import 'widgets_add/add_item_text_field.dart';
 
 class AddItemPage extends StatefulWidget {
   const AddItemPage({super.key});
