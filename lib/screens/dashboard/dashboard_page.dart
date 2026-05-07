@@ -1,10 +1,10 @@
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 
-import '../../widgets/dashboard/recent_activity_card.dart';
-import '../home/widgets_home/notification_bell.dart';
-import '../notifications/notification_page.dart';
 import '../../services/notification_alert_service.dart';
+import '../home/widgets_home/notification_bell.dart';
+import '../home/widgets_home/recent_activity_card.dart';
+import '../notifications/notification_page.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -15,42 +15,6 @@ class DashboardPage extends StatelessWidget {
   static const Color bg = Color(0xFFF8FAFC);
   static const Color textDark = Color(0xFF111827);
   static const Color textGrey = Color(0xFF6B7280);
-
-  int _nearExpiryCount(List<QueryDocumentSnapshot> docs) {
-    final now = DateTime.now();
-    int count = 0;
-
-    for (final doc in docs) {
-      final data = doc.data() as Map<String, dynamic>;
-      final expiry = data['expiryDate'];
-
-      if (expiry is Timestamp) {
-        final expiryDate = expiry.toDate();
-        final daysLeft = expiryDate.difference(now).inDays;
-
-        if (daysLeft >= 0 && daysLeft <= 4) {
-          count++;
-        }
-      }
-    }
-
-    return count;
-  }
-
-  int _lowStockCount(List<QueryDocumentSnapshot> docs) {
-    int count = 0;
-
-    for (final doc in docs) {
-      final data = doc.data() as Map<String, dynamic>;
-      final quantity = data['quantity'] ?? 0;
-
-      if (quantity is num && quantity <= 2) {
-        count++;
-      }
-    }
-
-    return count;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,18 +42,19 @@ class DashboardPage extends StatelessWidget {
               final nearExpiryAlerts =
                   NotificationAlertService.getNearExpiryAlerts(docs);
 
-              final lowStockCount = _lowStockCount(docs);
-              final totalAlerts = nearExpiryAlerts.length + lowStockCount;
+              final lowStockAlerts = NotificationAlertService.getLowStockAlerts(
+                docs,
+              );
 
               return NotificationBell(
-                count: totalAlerts,
+                count: nearExpiryAlerts.length + lowStockAlerts.length,
                 onTap: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => NotificationPage(
                         nearExpiryAlerts: nearExpiryAlerts,
-                        lowStockCount: lowStockCount,
+                        lowStockAlerts: lowStockAlerts,
                       ),
                     ),
                   );
@@ -106,14 +71,15 @@ class DashboardPage extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (!snapshot.hasData) {
-            return const Center(child: Text('No inventory data found.'));
-          }
+          final docs = snapshot.data?.docs ?? [];
 
-          final docs = snapshot.data!.docs;
-          final totalItems = docs.length;
-          final nearExpiry = _nearExpiryCount(docs);
-          final lowStock = _lowStockCount(docs);
+          final nearExpiryAlerts = NotificationAlertService.getNearExpiryAlerts(
+            docs,
+          );
+
+          final lowStockAlerts = NotificationAlertService.getLowStockAlerts(
+            docs,
+          );
 
           return SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
@@ -122,13 +88,12 @@ class DashboardPage extends StatelessWidget {
               children: [
                 _welcomeCard(),
                 const SizedBox(height: 18),
-
                 Row(
                   children: [
                     Expanded(
                       child: _summaryCard(
                         title: 'Total Items',
-                        value: totalItems.toString(),
+                        value: docs.length.toString(),
                         icon: Icons.inventory_2_outlined,
                         color: purple,
                       ),
@@ -137,22 +102,20 @@ class DashboardPage extends StatelessWidget {
                     Expanded(
                       child: _summaryCard(
                         title: 'Near Expiry',
-                        value: nearExpiry.toString(),
+                        value: nearExpiryAlerts.length.toString(),
                         icon: Icons.schedule_rounded,
                         color: Colors.orange,
                       ),
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 12),
-
                 Row(
                   children: [
                     Expanded(
                       child: _summaryCard(
                         title: 'Low Stock',
-                        value: lowStock.toString(),
+                        value: lowStockAlerts.length.toString(),
                         icon: Icons.warning_amber_rounded,
                         color: Colors.redAccent,
                       ),
@@ -168,12 +131,10 @@ class DashboardPage extends StatelessWidget {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 18),
                 _aiShortcutCard(),
-
                 const SizedBox(height: 18),
-                const RecentActivityCard(),
+                const HomeRecentActivityCard(),
               ],
             ),
           );

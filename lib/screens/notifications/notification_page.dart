@@ -4,12 +4,12 @@ import '../../services/notification_alert_service.dart';
 
 class NotificationPage extends StatelessWidget {
   final List<NearExpiryAlert> nearExpiryAlerts;
-  final int lowStockCount;
+  final List<LowStockAlert> lowStockAlerts;
 
   const NotificationPage({
     super.key,
     required this.nearExpiryAlerts,
-    required this.lowStockCount,
+    required this.lowStockAlerts,
   });
 
   static const Color bg = Color(0xFFF8FAFC);
@@ -19,7 +19,7 @@ class NotificationPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = nearExpiryAlerts.length + lowStockCount;
+    final total = nearExpiryAlerts.length + lowStockAlerts.length;
 
     return Scaffold(
       backgroundColor: bg,
@@ -99,13 +99,12 @@ class NotificationPage extends StatelessWidget {
             message: alert.message,
           ),
 
-        if (lowStockCount > 0)
+        for (final alert in lowStockAlerts)
           _notificationCard(
             icon: Icons.warning_amber_rounded,
             iconColor: Colors.redAccent,
-            title: 'Low stock items',
-            message:
-                '$lowStockCount item(s) are running low. Consider restocking soon.',
+            title: alert.quantity <= 0 ? 'Out of stock item' : 'Low stock item',
+            message: alert.message,
           ),
       ],
     );
