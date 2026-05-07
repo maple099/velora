@@ -16,6 +16,7 @@ class NotificationPage extends StatelessWidget {
   static const Color textDark = Color(0xFF111827);
   static const Color textGrey = Color(0xFF6B7280);
   static const Color purple = Color(0xFF7C3AED);
+  static const Color border = Color(0xFFE5E7EB);
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +33,7 @@ class NotificationPage extends StatelessWidget {
           style: TextStyle(color: textDark, fontWeight: FontWeight.w900),
         ),
       ),
-      body: total == 0 ? _emptyState() : _notificationList(),
+      body: total == 0 ? _emptyState() : _historyList(total),
     );
   }
 
@@ -48,7 +49,7 @@ class NotificationPage extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white,
                 shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFFE5E7EB)),
+                border: Border.all(color: border),
               ),
               child: const Icon(
                 Icons.notifications_none_rounded,
@@ -77,35 +78,146 @@ class NotificationPage extends StatelessWidget {
     );
   }
 
-  Widget _notificationList() {
+  Widget _historyList(int total) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
       children: [
-        const Text(
-          'Today',
-          style: TextStyle(
-            color: textDark,
-            fontSize: 18,
-            fontWeight: FontWeight.w900,
+        _summaryHeader(total),
+        const SizedBox(height: 18),
+
+        if (nearExpiryAlerts.isNotEmpty)
+          _sectionTitle(
+            icon: Icons.schedule_rounded,
+            title: 'Near Expiry Alerts',
+            count: nearExpiryAlerts.length,
+            color: Colors.orange,
           ),
-        ),
-        const SizedBox(height: 14),
+
+        if (nearExpiryAlerts.isNotEmpty) const SizedBox(height: 12),
 
         for (final alert in nearExpiryAlerts)
           _notificationCard(
             icon: Icons.schedule_rounded,
             iconColor: Colors.orange,
-            title: 'Near expiry item',
+            title: _nearExpiryTitle(alert.daysLeft),
             message: alert.message,
           ),
+
+        if (nearExpiryAlerts.isNotEmpty && lowStockAlerts.isNotEmpty)
+          const SizedBox(height: 8),
+
+        if (lowStockAlerts.isNotEmpty)
+          _sectionTitle(
+            icon: Icons.warning_amber_rounded,
+            title: 'Low Stock Alerts',
+            count: lowStockAlerts.length,
+            color: Colors.redAccent,
+          ),
+
+        if (lowStockAlerts.isNotEmpty) const SizedBox(height: 12),
 
         for (final alert in lowStockAlerts)
           _notificationCard(
             icon: Icons.warning_amber_rounded,
-            iconColor: Colors.redAccent,
-            title: alert.quantity <= 0 ? 'Out of stock item' : 'Low stock item',
+            iconColor: alert.quantity <= 0 ? Colors.red : Colors.redAccent,
+            title: alert.quantity <= 0 ? 'Out of Stock' : 'Low Stock',
             message: alert.message,
           ),
+      ],
+    );
+  }
+
+  Widget _summaryHeader(int total) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [purple, Color(0xFFA855F7)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.notifications_active_rounded,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$total active alert(s)',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Review items that need attention today.',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12.8,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionTitle({
+    required IconData icon,
+    required String title,
+    required int count,
+    required Color color,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+              color: textDark,
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            count.toString(),
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -122,7 +234,7 @@ class NotificationPage extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: border),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -170,5 +282,11 @@ class NotificationPage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _nearExpiryTitle(int daysLeft) {
+    if (daysLeft == 0) return 'Expires Today';
+    if (daysLeft == 1) return 'Expires Tomorrow';
+    return 'Expiring Soon';
   }
 }
