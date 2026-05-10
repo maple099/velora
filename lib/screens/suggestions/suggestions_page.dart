@@ -12,8 +12,13 @@ import '../../logic/ai_reset_helper.dart';
 import '../../logic/gemini_service.dart';
 import '../../logic/suggestion_helper.dart';
 import '../../models/inventory_item.dart';
+
 import '../../widgets/suggestions/quota_status_card.dart';
 import '../../widgets/suggestions/suggestion_sections.dart';
+
+import 'restock_suggestion_service.dart';
+
+import 'widgets_suggestions/restock_suggestion_card.dart';
 import 'widgets_suggestions/suggestion_ai_result.dart';
 
 class SuggestionsPage extends StatefulWidget {
@@ -31,6 +36,8 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
   final AiInventoryChecker _inventoryChecker = AiInventoryChecker();
   final AiRecipeSaveService _recipeSaveService = AiRecipeSaveService();
   final SuggestionHelper _helper = SuggestionHelper();
+
+  final RestockSuggestionService _restockService = RestockSuggestionService();
 
   bool _isLoading = false;
   bool _isCached = false;
@@ -53,6 +60,7 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
   @override
   void initState() {
     super.initState();
+
     _loadQuota();
     _updateResetCountdown();
 
@@ -65,6 +73,7 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
   void dispose() {
     _cooldownTimer?.cancel();
     _resetTimer?.cancel();
+
     super.dispose();
   }
 
@@ -146,6 +155,7 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
   }) async {
     if (_cooldownSeconds > 0) {
       _showSnack('Please wait $_cooldownSeconds seconds.');
+
       return;
     }
 
@@ -180,6 +190,7 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
 
     if (data['isError'] == true || _isErrorResult(result)) {
       _handleAiError(result);
+
       return;
     }
 
@@ -241,6 +252,7 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
 
   void _startCooldown(int seconds) {
     _cooldownTimer?.cancel();
+
     setState(() => _cooldownSeconds = seconds);
 
     _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -262,6 +274,7 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
 
   int _extractSeconds(String text) {
     final match = RegExp(r'(\d+)\sseconds').firstMatch(text);
+
     return int.tryParse(match?.group(1) ?? '') ?? 0;
   }
 
@@ -279,9 +292,17 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
   String _statusFromError(String text) {
     final lower = text.toLowerCase();
 
-    if (lower.contains('quota')) return 'Quota limited';
-    if (lower.contains('api key')) return 'API key error';
-    if (lower.contains('network')) return 'Network error';
+    if (lower.contains('quota')) {
+      return 'Quota limited';
+    }
+
+    if (lower.contains('api key')) {
+      return 'API key error';
+    }
+
+    if (lower.contains('network')) {
+      return 'Network error';
+    }
 
     return 'Temporary error';
   }
@@ -311,7 +332,12 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
             }
 
             final items = _helper.convertDocs(snapshot.data!.docs);
+
             final nearExpiry = _helper.nearExpiryItems(items);
+
+            final restockSuggestions = _restockService.generateSuggestions(
+              snapshot.data!.docs,
+            );
 
             WidgetsBinding.instance.addPostFrameCallback((_) {
               _autoLoadCache(items);
@@ -324,7 +350,9 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SuggestionPageTitle(),
+
                   const SizedBox(height: 18),
+
                   QuotaStatusCard(
                     used: _usedQuota,
                     limit: AiQuotaService.dailyLimit,
@@ -334,23 +362,48 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
                     resetTimeText: _resetTimeText,
                     geminiStatus: _geminiStatus,
                   ),
+
                   const SizedBox(height: 18),
+
                   SuggestionActionButtons(
                     onRecipeTap: () => _generateRecipes(items),
                     onRestockTap: () => _generateRestock(items),
                   ),
+
                   const SizedBox(height: 26),
+
                   const SuggestionSectionTitle(title: 'Near Expiry Items'),
+
                   const SizedBox(height: 12),
+
                   NearExpirySection(
                     nearExpiry: nearExpiry,
                     daysLeftText: _helper.daysLeftText,
                   ),
+
+                  if (restockSuggestions.isNotEmpty) ...[
+                    const SizedBox(height: 26),
+
+                    const SuggestionSectionTitle(
+                      title: 'Smart Restock Suggestions',
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    ...restockSuggestions.map(
+                      (suggestion) =>
+                          RestockSuggestionCard(suggestion: suggestion),
+                    ),
+                  ],
+
                   const SizedBox(height: 26),
+
                   SuggestionSectionTitle(
                     title: _isRecipeResult ? 'AI Recipes' : 'Restock Advice',
                   ),
+
                   const SizedBox(height: 12),
+
                   SuggestionAiResult(
                     isLoading: _isLoading,
                     isRecipeResult: _isRecipeResult,
