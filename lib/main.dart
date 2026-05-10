@@ -3,6 +3,9 @@ import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
 
+// SERVICES
+import 'services/local_notification_service.dart';
+
 // AUTH
 import 'screens/auth/splash_page.dart';
 import 'screens/auth/login_page.dart';
@@ -23,6 +26,8 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  await LocalNotificationService.init();
 
   runApp(const VeloraApp());
 }

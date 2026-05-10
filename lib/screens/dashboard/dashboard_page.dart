@@ -7,6 +7,7 @@ import '../inventory/add_item/add_item_page.dart';
 import '../inventory/inventory_page.dart';
 import '../notifications/notification_page.dart';
 import '../suggestions/suggestions_page.dart';
+import '../../services/local_notification_service.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -109,7 +110,14 @@ class DashboardPage extends StatelessWidget {
                   onInventoryTap: () => _goTo(context, const InventoryPage()),
                   onSuggestionTap: () =>
                       _goTo(context, const SuggestionsPage()),
-                  onAlertTap: () => _goTo(context, const NotificationPage()),
+                  onAlertTap: () async {
+                    await LocalNotificationService.showNotification(
+                      title: 'Velora Alert',
+                      body: 'You have inventory items that need attention.',
+                    );
+
+                    _goTo(context, const NotificationPage());
+                  },
                 ),
                 const SizedBox(height: 18),
                 const RecentActivityCard(),
