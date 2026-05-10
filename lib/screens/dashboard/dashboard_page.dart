@@ -1,13 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../../services/auto_notification_trigger_service.dart';
 import '../home/widgets_home/notification_bell.dart';
 import '../home/widgets_home/recent_activity_card.dart';
 import '../inventory/add_item/add_item_page.dart';
 import '../inventory/inventory_page.dart';
 import '../notifications/notification_page.dart';
 import '../suggestions/suggestions_page.dart';
-import '../../services/local_notification_service.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -57,6 +57,12 @@ class DashboardPage extends StatelessWidget {
     Navigator.push(context, MaterialPageRoute(builder: (_) => page));
   }
 
+  void _triggerAutoNotification() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AutoNotificationTriggerService.checkAndTriggerUnreadAlerts();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -75,6 +81,8 @@ class DashboardPage extends StatelessWidget {
             final totalItems = docs.length;
             final nearExpiry = _nearExpiryCount(docs);
             final lowStock = _lowStockCount(docs);
+
+            _triggerAutoNotification();
 
             return ListView(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -110,14 +118,7 @@ class DashboardPage extends StatelessWidget {
                   onInventoryTap: () => _goTo(context, const InventoryPage()),
                   onSuggestionTap: () =>
                       _goTo(context, const SuggestionsPage()),
-                  onAlertTap: () async {
-                    await LocalNotificationService.showNotification(
-                      title: 'Velora Alert',
-                      body: 'You have inventory items that need attention.',
-                    );
-
-                    _goTo(context, const NotificationPage());
-                  },
+                  onAlertTap: () => _goTo(context, const NotificationPage()),
                 ),
                 const SizedBox(height: 18),
                 const RecentActivityCard(),
