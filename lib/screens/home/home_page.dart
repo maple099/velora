@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../dashboard/dashboard_page.dart';
 import '../inventory/inventory_page.dart';
-import '../reports/reports_page.dart';
 import '../suggestions/suggestions_page.dart';
 import '../inventory/add_item/add_item_page.dart';
 
@@ -21,7 +20,7 @@ class _HomePageState extends State<HomePage> {
     InventoryPage(),
     SizedBox(),
     SuggestionsPage(),
-    ReportsPage(),
+    SizedBox(),
   ];
 
   void _changePage(int index) {
@@ -96,8 +95,8 @@ class _BottomBar extends StatelessWidget {
             onTap: () => onTap(3),
           ),
           _NavItem(
-            icon: Icons.bar_chart_rounded,
-            text: 'Reports',
+            icon: Icons.person_rounded,
+            text: 'Profile',
             active: currentIndex == 4,
             onTap: () => onTap(4),
           ),
