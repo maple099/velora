@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../services/user_profile_service.dart';
 import '../auth/login_page.dart';
 import 'widgets_settings/app_info_card.dart';
 import 'widgets_settings/edit_profile_dialog.dart';
@@ -19,6 +20,8 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+  final UserProfileService _userProfileService = UserProfileService();
+
   bool nearExpiryAlerts = true;
   bool lowStockAlerts = true;
   bool activityUpdates = false;
@@ -28,6 +31,15 @@ class _SettingsPageState extends State<SettingsPage> {
   void initState() {
     super.initState();
     _loadSettings();
+    _createUserProfile();
+  }
+
+  Future<void> _createUserProfile() async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) return;
+
+    await _userProfileService.createUserProfileIfNeeded(user);
   }
 
   Future<void> _loadSettings() async {
@@ -111,9 +123,9 @@ class _SettingsPageState extends State<SettingsPage> {
                   subtitle: 'Tap profile card to update name and photo',
                 ),
                 _AccountTile(
-                  icon: Icons.lock_outline_rounded,
-                  title: 'Firebase Account',
-                  subtitle: 'Connected with Firebase Authentication',
+                  icon: Icons.admin_panel_settings_outlined,
+                  title: 'Account Role',
+                  subtitle: 'Current user is prepared as Owner by default',
                 ),
               ],
             ),
