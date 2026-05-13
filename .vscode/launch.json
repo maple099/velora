@@ -7,7 +7,7 @@
       "type": "dart",
       "deviceId": "chrome",
       "toolArgs": [
-        "--dart-define=GEMINI_API_KEY=AIzaSyALbpLBV0vCGIXnnyuLDGR_BUayMop91YI"
+        "--dart-define=GEMINI_API_KEY=AIzaSyDeXOsD19iSJ0yHbu17a6Yaj09nKm4fBUE"
       ]
     }
   ]

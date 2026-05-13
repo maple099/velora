@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/inventory_item.dart';
-import '../screens/suggestions/utils/recipe_parser.dart';
+import '../screens/suggestions/utils_suggestions/recipe_parser.dart';
 
 class AiRecipeSaveService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;

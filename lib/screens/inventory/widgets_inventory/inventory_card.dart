@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../../models/inventory_item.dart';
-import '../utils/expiry_helper.dart';
+import '../utils_inventory/expiry_helper.dart';
 
 class InventoryCard extends StatelessWidget {
   final InventoryItem item;

@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import '../../models/inventory_item.dart';
 import '../../services/activity_service.dart';
 import 'edit_item_page.dart';
-import 'utils/expiry_helper.dart';
+import 'utils_inventory/expiry_helper.dart';
 import 'widgets_inventory/item_detail_action_button.dart';
 import 'widgets_inventory/item_detail_info_card.dart';
 import 'widgets_inventory/mark_as_used_dialog.dart';

@@ -10,8 +10,8 @@ import '../../../widgets/suggestions/inventory_changed_card.dart';
 import '../../../widgets/suggestions/premium_loading_card.dart';
 import '../../../widgets/suggestions/result_cards.dart';
 import '../recipe_detail_page.dart';
-import '../utils/fallback_recipe_builder.dart';
-import '../utils/recipe_parser.dart';
+import '../utils_suggestions/fallback_recipe_builder.dart';
+import '../utils_suggestions/recipe_parser.dart';
 import 'recipe_preview_card.dart';
 
 class SuggestionAiResult extends StatelessWidget {

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/inventory_item.dart';
 import 'item_details_page.dart';
-import 'utils/inventory_sort_helper.dart';
+import 'utils_inventory/inventory_sort_helper.dart';
 import 'widgets_inventory/inventory_card.dart';
 import 'widgets_inventory/inventory_empty_state.dart';
 import 'widgets_inventory/inventory_filter_chips.dart';
