@@ -4,6 +4,7 @@ import '../dashboard/dashboard_page.dart';
 import '../inventory/inventory_page.dart';
 import '../suggestions/suggestions_page.dart';
 import '../inventory/add_item/add_item_page.dart';
+import '../settings/settings_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -20,7 +21,7 @@ class _HomePageState extends State<HomePage> {
     InventoryPage(),
     SizedBox(),
     SuggestionsPage(),
-    SizedBox(),
+    SettingsPage(),
   ];
 
   void _changePage(int index) {
@@ -43,7 +44,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: SafeArea(child: _pages[_selectedIndex]),
+      body: _pages[_selectedIndex],
       bottomNavigationBar: _BottomBar(
         currentIndex: _selectedIndex,
         onTap: _changePage,
