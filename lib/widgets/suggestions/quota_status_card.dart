@@ -28,8 +28,14 @@ class QuotaStatusCard extends StatelessWidget {
     final status = geminiStatus.toLowerCase();
 
     if (_isQuotaLimited) return const Color(0xFFEF4444);
-    if (status.contains('available')) return const Color(0xFF10B981);
-    if (status.contains('error')) return const Color(0xFFF97316);
+
+    if (status.contains('available')) {
+      return const Color(0xFF10B981);
+    }
+
+    if (status.contains('error')) {
+      return const Color(0xFFF97316);
+    }
 
     return const Color(0xFF7C3AED);
   }
@@ -37,8 +43,13 @@ class QuotaStatusCard extends StatelessWidget {
   IconData get _statusIcon {
     final status = geminiStatus.toLowerCase();
 
-    if (_isQuotaLimited) return Icons.warning_amber_rounded;
-    if (status.contains('available')) return Icons.check_circle_rounded;
+    if (_isQuotaLimited) {
+      return Icons.warning_amber_rounded;
+    }
+
+    if (status.contains('available')) {
+      return Icons.check_circle_rounded;
+    }
 
     return Icons.auto_awesome_rounded;
   }
@@ -59,7 +70,7 @@ class QuotaStatusCard extends StatelessWidget {
     }
 
     if (status.contains('available')) {
-      return 'Gemini is ready';
+      return 'Groq is ready';
     }
 
     if (status.contains('error')) {
@@ -94,7 +105,9 @@ class QuotaStatusCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _QuotaIconBox(color: _statusColor, icon: _statusIcon),
+
           const SizedBox(width: 16),
+
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -107,7 +120,9 @@ class QuotaStatusCard extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
+
                 const SizedBox(height: 8),
+
                 Text(
                   'Reset estimate: $resetCountdown',
                   style: const TextStyle(
@@ -116,7 +131,9 @@ class QuotaStatusCard extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
+
                 const SizedBox(height: 3),
+
                 Text(
                   resetTimeText,
                   style: const TextStyle(
@@ -125,8 +142,10 @@ class QuotaStatusCard extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
+
                 const SizedBox(height: 12),
-                _GeminiStatusCard(
+
+                _GroqStatusCard(
                   color: _statusColor,
                   status: geminiStatus,
                   message: _statusMessage,
@@ -160,12 +179,12 @@ class _QuotaIconBox extends StatelessWidget {
   }
 }
 
-class _GeminiStatusCard extends StatelessWidget {
+class _GroqStatusCard extends StatelessWidget {
   final Color color;
   final String status;
   final String message;
 
-  const _GeminiStatusCard({
+  const _GroqStatusCard({
     required this.color,
     required this.status,
     required this.message,
@@ -188,10 +207,12 @@ class _GeminiStatusCard extends StatelessWidget {
             width: 8,
             decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
+
           const SizedBox(width: 9),
+
           Expanded(
             child: Text(
-              'Gemini API: $status • $message',
+              'Groq API: $status • $message',
               style: TextStyle(
                 color: color,
                 fontSize: 11.5,
