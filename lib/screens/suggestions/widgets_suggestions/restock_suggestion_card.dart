@@ -12,12 +12,20 @@ class RestockSuggestionCard extends StatelessWidget {
       return const Color(0xFFEF4444);
     }
 
-    return const Color(0xFFF59E0B);
+    if (suggestion.priority == 2) {
+      return const Color(0xFFF59E0B);
+    }
+
+    return const Color(0xFF10B981);
   }
 
   IconData get icon {
     if (suggestion.priority == 1) {
       return Icons.warning_rounded;
+    }
+
+    if (suggestion.priority == 2) {
+      return Icons.priority_high_rounded;
     }
 
     return Icons.shopping_cart_rounded;
@@ -31,7 +39,7 @@ class RestockSuggestionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: color.withAlpha(40)),
+        border: Border.all(color: color.withAlpha(45)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withAlpha(8),
@@ -41,10 +49,11 @@ class RestockSuggestionCard extends StatelessWidget {
         ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor: color.withAlpha(20),
+            backgroundColor: color.withAlpha(22),
             child: Icon(icon, color: color),
           ),
           const SizedBox(width: 14),
@@ -52,15 +61,8 @@ class RestockSuggestionCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  suggestion.itemName,
-                  style: const TextStyle(
-                    color: Color(0xFF111827),
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 5),
+                _TopRow(suggestion: suggestion, color: color),
+                const SizedBox(height: 6),
                 Text(
                   suggestion.reason,
                   style: const TextStyle(
@@ -70,7 +72,119 @@ class RestockSuggestionCard extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  suggestion.suggestion,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 13,
+                    height: 1.4,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _InfoChip(
+                      icon: Icons.inventory_2_rounded,
+                      text: 'Qty ${suggestion.quantity}',
+                    ),
+                    _InfoChip(
+                      icon: Icons.category_rounded,
+                      text: suggestion.category,
+                    ),
+                    if (suggestion.daysLeft != null)
+                      _InfoChip(
+                        icon: Icons.event_rounded,
+                        text: _daysText(suggestion.daysLeft!),
+                      ),
+                  ],
+                ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _daysText(int days) {
+    if (days < 0) return 'Expired';
+    if (days == 0) return 'Expires today';
+    if (days == 1) return '1 day left';
+
+    return '$days days left';
+  }
+}
+
+class _TopRow extends StatelessWidget {
+  final RestockSuggestion suggestion;
+  final Color color;
+
+  const _TopRow({required this.suggestion, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            suggestion.itemName,
+            style: const TextStyle(
+              color: Color(0xFF111827),
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: color.withAlpha(18),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            suggestion.priorityLabel,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _InfoChip({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: const Color(0xFF6B7280)),
+          const SizedBox(width: 5),
+          Text(
+            text,
+            style: const TextStyle(
+              color: Color(0xFF6B7280),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
