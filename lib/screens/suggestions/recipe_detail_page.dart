@@ -1,6 +1,9 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-class RecipeDetailPage extends StatelessWidget {
+import 'logic_suggestions/cook_now_deduction_service.dart';
+
+class RecipeDetailPage extends StatefulWidget {
   final String title;
   final List<String> ingredients;
   final List<String> steps;
@@ -16,10 +19,162 @@ class RecipeDetailPage extends StatelessWidget {
     required this.whyRecommended,
   });
 
+  @override
+  State<RecipeDetailPage> createState() => _RecipeDetailPageState();
+}
+
+class _RecipeDetailPageState extends State<RecipeDetailPage> {
+  final CookNowDeductionService _deductionService = CookNowDeductionService();
+
+  bool _isCooking = false;
+
   bool _isNearExpiry(String ingredient) {
-    return nearExpiryIngredients.any(
+    return widget.nearExpiryIngredients.any(
       (item) => item.toLowerCase().trim() == ingredient.toLowerCase().trim(),
     );
+  }
+
+  Future<void> _handleCookNow() async {
+    if (_isCooking) return;
+
+    setState(() => _isCooking = true);
+
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+
+      user ??= await FirebaseAuth.instance
+          .authStateChanges()
+          .firstWhere((authUser) => authUser != null, orElse: () => null)
+          .timeout(const Duration(seconds: 3), onTimeout: () => null);
+
+      if (!mounted) return;
+
+      if (user == null) {
+        setState(() => _isCooking = false);
+
+        _showSnackBar(
+          message:
+              'Login session not detected. Please reopen app and login again.',
+          isError: true,
+        );
+        return;
+      }
+
+      final result = await _deductionService
+          .deductRecipeIngredients(
+            userId: user.uid,
+            recipeTitle: widget.title,
+            ingredients: widget.ingredients,
+          )
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              return const CookNowDeductionResult(
+                success: false,
+                message: 'Inventory update took too long. Please try again.',
+                usedItems: [],
+                skippedItems: [],
+              );
+            },
+          );
+
+      if (!mounted) return;
+
+      setState(() => _isCooking = false);
+
+      _showResultDialog(result);
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() => _isCooking = false);
+
+      _showSnackBar(
+        message: 'Failed to use Cook Now. Please try again.',
+        isError: true,
+      );
+    }
+  }
+
+  void _showSnackBar({required String message, required bool isError}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: isError
+            ? const Color(0xFFEF4444)
+            : const Color(0xFF10B981),
+        content: Text(
+          message,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
+  }
+
+  void _showResultDialog(CookNowDeductionResult result) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: Text(
+            result.success ? 'Inventory Updated' : 'Cook Now Failed',
+            style: const TextStyle(fontWeight: FontWeight.w900),
+          ),
+          content: SingleChildScrollView(
+            child: Text(
+              _buildResultMessage(result),
+              style: const TextStyle(
+                color: Color(0xFF374151),
+                height: 1.45,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+
+                if (result.success) {
+                  Navigator.pop(context, true);
+                }
+              },
+              child: const Text(
+                'OK',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _buildResultMessage(CookNowDeductionResult result) {
+    final buffer = StringBuffer();
+
+    buffer.writeln(result.message);
+
+    if (result.usedItems.isNotEmpty) {
+      buffer.writeln('');
+      buffer.writeln('Used items:');
+
+      for (final item in result.usedItems) {
+        buffer.writeln('• $item');
+      }
+    }
+
+    if (result.skippedItems.isNotEmpty) {
+      buffer.writeln('');
+      buffer.writeln('Skipped items:');
+
+      for (final item in result.skippedItems) {
+        buffer.writeln('• $item');
+      }
+    }
+
+    return buffer.toString().trim();
   }
 
   @override
@@ -45,16 +200,16 @@ class RecipeDetailPage extends StatelessWidget {
           isSmall ? 16 : 20,
           8,
           isSmall ? 16 : 20,
-          28,
+          110,
         ),
         children: [
-          _HeroCard(title: title, isSmall: isSmall),
+          _HeroCard(title: widget.title, isSmall: isSmall),
           const SizedBox(height: 18),
           _SectionCard(
             title: 'Ingredients',
             icon: Icons.restaurant_menu_rounded,
             child: Column(
-              children: ingredients.map((ingredient) {
+              children: widget.ingredients.map((ingredient) {
                 return _IngredientRow(
                   name: ingredient,
                   isNearExpiry: _isNearExpiry(ingredient),
@@ -67,14 +222,75 @@ class RecipeDetailPage extends StatelessWidget {
             title: 'Cooking Steps',
             icon: Icons.list_alt_rounded,
             child: Column(
-              children: List.generate(steps.length, (index) {
-                return _StepRow(number: index + 1, text: steps[index]);
+              children: List.generate(widget.steps.length, (index) {
+                return _StepRow(number: index + 1, text: widget.steps[index]);
               }),
             ),
           ),
           const SizedBox(height: 18),
-          _WhyCard(text: whyRecommended),
+          _WhyCard(text: widget.whyRecommended),
         ],
+      ),
+      bottomNavigationBar: _CookNowBottomBar(
+        isCooking: _isCooking,
+        onPressed: _handleCookNow,
+      ),
+    );
+  }
+}
+
+class _CookNowBottomBar extends StatelessWidget {
+  final bool isCooking;
+  final VoidCallback onPressed;
+
+  const _CookNowBottomBar({required this.isCooking, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, -8),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 54,
+          child: ElevatedButton.icon(
+            onPressed: isCooking ? null : onPressed,
+            icon: isCooking
+                ? const SizedBox(
+                    height: 19,
+                    width: 19,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.3,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.restaurant_rounded),
+            label: Text(
+              isCooking ? 'Updating Inventory...' : 'Cook Now',
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF7C3AED),
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: const Color(0xFFC4B5FD),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

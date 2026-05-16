@@ -1,5 +1,9 @@
 import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
+import '../home/home_page.dart';
 import 'login_page.dart';
 
 class SplashPage extends StatefulWidget {
@@ -13,13 +17,27 @@ class _SplashPageState extends State<SplashPage> {
   @override
   void initState() {
     super.initState();
+    checkLoginStatus();
+  }
 
-    Timer(const Duration(seconds: 3), () {
+  Future<void> checkLoginStatus() async {
+    await Future.delayed(const Duration(seconds: 3));
+
+    if (!mounted) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user != null) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomePage()),
+      );
+    } else {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const LoginPage()),
       );
-    });
+    }
   }
 
   @override
@@ -132,6 +150,7 @@ class FoodPatternPainter extends CustomPainter {
         ..moveTo(x, y + h)
         ..quadraticBezierTo(x + w, y + h * 0.35, x + w * 0.35, y)
         ..quadraticBezierTo(x - w * 0.25, y + h * 0.35, x, y + h);
+
       canvas.drawPath(path, paint);
       canvas.drawLine(
         Offset(x, y + h),
@@ -159,12 +178,14 @@ class FoodPatternPainter extends CustomPainter {
       ..moveTo(210, 220)
       ..quadraticBezierTo(280, 270, 330, 190)
       ..quadraticBezierTo(270, 230, 220, 180);
+
     canvas.drawPath(banana, paint);
 
     final branch = Path()
       ..moveTo(120, 170)
       ..quadraticBezierTo(180, 140, 250, 160)
       ..quadraticBezierTo(300, 175, 340, 145);
+
     canvas.drawPath(branch, paint);
 
     for (final p in [

@@ -1,4 +1,6 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
 import 'signup_page.dart';
 import 'forgot_password_page.dart';
 import '../home/home_page.dart';
@@ -15,12 +17,73 @@ class _LoginPageState extends State<LoginPage> {
   final passwordController = TextEditingController();
 
   bool hidePassword = true;
+  bool isLoading = false;
 
   @override
   void dispose() {
     emailController.dispose();
     passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> loginUser() async {
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      showMessage('Please enter email and password.', true);
+      return;
+    }
+
+    setState(() => isLoading = true);
+
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomePage()),
+      );
+    } on FirebaseAuthException catch (e) {
+      String message = 'Login failed. Please try again.';
+
+      if (e.code == 'user-not-found') {
+        message = 'No account found for this email.';
+      } else if (e.code == 'wrong-password') {
+        message = 'Incorrect password.';
+      } else if (e.code == 'invalid-email') {
+        message = 'Invalid email address.';
+      } else if (e.code == 'invalid-credential') {
+        message = 'Invalid email or password.';
+      }
+
+      showMessage(message, true);
+    } catch (_) {
+      showMessage('Something went wrong. Please try again.', true);
+    }
+
+    if (mounted) {
+      setState(() => isLoading = false);
+    }
+  }
+
+  void showMessage(String message, bool isError) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: isError
+            ? const Color(0xFFEF4444)
+            : const Color(0xFF10B981),
+        content: Text(
+          message,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
   }
 
   InputDecoration inputDecoration({
@@ -138,7 +201,6 @@ class _LoginPageState extends State<LoginPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 55),
-
               const Center(
                 child: Text(
                   'Welcome Back!',
@@ -149,29 +211,21 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 8),
-
               const Center(
                 child: Text(
                   'Login to continue',
                   style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
                 ),
               ),
-
               const SizedBox(height: 20),
-
               Center(child: veloraLogo()),
-
               const SizedBox(height: 26),
-
               const Text(
                 'Email Address',
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
               ),
-
               const SizedBox(height: 8),
-
               TextField(
                 controller: emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -180,16 +234,12 @@ class _LoginPageState extends State<LoginPage> {
                   icon: Icons.email_outlined,
                 ),
               ),
-
               const SizedBox(height: 18),
-
               const Text(
                 'Password',
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
               ),
-
               const SizedBox(height: 8),
-
               TextField(
                 controller: passwordController,
                 obscureText: hidePassword,
@@ -212,20 +262,20 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 6),
-
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ForgotPasswordPage(),
-                      ),
-                    );
-                  },
+                  onPressed: isLoading
+                      ? null
+                      : () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ForgotPasswordPage(),
+                            ),
+                          );
+                        },
                   child: const Text(
                     'Forgot Password?',
                     style: TextStyle(
@@ -236,48 +286,47 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 8),
-
               SizedBox(
                 width: double.infinity,
                 height: 54,
                 child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (_) => const HomePage()),
-                    );
-                  },
+                  onPressed: isLoading ? null : loginUser,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF8B5CF6),
+                    disabledBackgroundColor: const Color(0xFFC4B5FD),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: const Text(
-                    'Login',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
+                  child: isLoading
+                      ? const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      : const Text(
+                          'Login',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
                 ),
               ),
-
               const SizedBox(height: 18),
-
               const Center(
                 child: Text(
                   'or continue with',
                   style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
                 ),
               ),
-
               const SizedBox(height: 12),
-
               Center(
                 child: SizedBox(
                   width: double.infinity,
@@ -285,9 +334,7 @@ class _LoginPageState extends State<LoginPage> {
                   child: socialButton(),
                 ),
               ),
-
               const SizedBox(height: 14),
-
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -296,12 +343,16 @@ class _LoginPageState extends State<LoginPage> {
                     style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
                   ),
                   GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const SignUpPage()),
-                      );
-                    },
+                    onTap: isLoading
+                        ? null
+                        : () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const SignUpPage(),
+                              ),
+                            );
+                          },
                     child: const Text(
                       'Sign Up',
                       style: TextStyle(
