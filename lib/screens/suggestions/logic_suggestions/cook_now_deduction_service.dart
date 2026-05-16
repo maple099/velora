@@ -20,21 +20,24 @@ class CookNowDeductionService {
   CookNowDeductionService({FirebaseFirestore? firestore})
     : _firestore = firestore ?? FirebaseFirestore.instance;
 
+  CollectionReference<Map<String, dynamic>> get _inventoryRef {
+    return _firestore.collection('inventory');
+  }
+
+  CollectionReference<Map<String, dynamic>> get _recordsRef {
+    return _firestore.collection('inventory_records');
+  }
+
+  CollectionReference<Map<String, dynamic>> get _activitiesRef {
+    return _firestore.collection('activities');
+  }
+
   Future<CookNowDeductionResult> deductRecipeIngredients({
     required String userId,
     required String recipeTitle,
     required List<String> ingredients,
   }) async {
     try {
-      if (userId.trim().isEmpty) {
-        return const CookNowDeductionResult(
-          success: false,
-          message: 'User is not logged in.',
-          usedItems: [],
-          skippedItems: [],
-        );
-      }
-
       if (ingredients.isEmpty) {
         return const CookNowDeductionResult(
           success: false,
@@ -44,12 +47,7 @@ class CookNowDeductionService {
         );
       }
 
-      final inventoryRef = _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('inventory');
-
-      final snapshot = await inventoryRef.get();
+      final snapshot = await _inventoryRef.get();
 
       final usedItems = <String>[];
       final skippedItems = <String>[];
@@ -57,6 +55,7 @@ class CookNowDeductionService {
       final normalizedIngredients = ingredients
           .map(_cleanName)
           .where((name) => name.isNotEmpty)
+          .toSet()
           .toList();
 
       for (final ingredient in normalizedIngredients) {
@@ -72,32 +71,29 @@ class CookNowDeductionService {
 
         final data = matchedDoc.data();
 
-        final name = (data['name'] ?? ingredient).toString();
+        final itemName = (data['name'] ?? ingredient).toString();
         final quantity = _toInt(data['quantity']);
         final expiryDate = _toDateTime(data['expiryDate']);
 
         if (quantity <= 0) {
-          skippedItems.add('$name has no stock');
+          skippedItems.add('$itemName has no stock');
           continue;
         }
 
         if (expiryDate != null && _isExpired(expiryDate)) {
-          skippedItems.add('$name is expired');
+          skippedItems.add('$itemName is expired');
           continue;
         }
 
-        await matchedDoc.reference.update({
-          'quantity': quantity - 1,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
+        final newQuantity = quantity - 1;
 
-        await _saveActivity(
-          userId: userId,
-          itemName: name,
-          recipeTitle: recipeTitle,
-        );
+        await matchedDoc.reference.update({'quantity': newQuantity});
 
-        usedItems.add(name);
+        await _addInventoryRecord(itemName: itemName, quantity: 1);
+
+        await _addActivity(itemName: itemName, recipeTitle: recipeTitle);
+
+        usedItems.add(itemName);
       }
 
       if (usedItems.isEmpty) {
@@ -131,6 +127,7 @@ class CookNowDeductionService {
   }) {
     for (final doc in docs) {
       final data = doc.data();
+
       final itemName = _cleanName((data['name'] ?? '').toString());
 
       if (itemName == ingredient) {
@@ -145,24 +142,29 @@ class CookNowDeductionService {
     return null;
   }
 
-  Future<void> _saveActivity({
-    required String userId,
+  Future<void> _addInventoryRecord({
+    required String itemName,
+    required int quantity,
+  }) async {
+    if (quantity <= 0) return;
+
+    await _recordsRef.add({
+      'itemName': itemName,
+      'type': 'stock_out',
+      'quantity': quantity,
+      'createdAt': Timestamp.now(),
+    });
+  }
+
+  Future<void> _addActivity({
     required String itemName,
     required String recipeTitle,
   }) async {
-    final activityRef = _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('activities');
-
-    await activityRef.add({
+    await _activitiesRef.add({
       'type': 'stock_out',
-      'title': 'Ingredient used',
-      'message': '$itemName used for $recipeTitle',
-      'itemName': itemName,
-      'recipeTitle': recipeTitle,
-      'quantityChanged': -1,
-      'createdAt': FieldValue.serverTimestamp(),
+      'title': 'Used $itemName',
+      'subtitle': '$itemName used for $recipeTitle',
+      'createdAt': Timestamp.now(),
     });
   }
 
@@ -190,7 +192,9 @@ class CookNowDeductionService {
 
   bool _isExpired(DateTime expiryDate) {
     final now = DateTime.now();
+
     final today = DateTime(now.year, now.month, now.day);
+
     final expiry = DateTime(expiryDate.year, expiryDate.month, expiryDate.day);
 
     return expiry.isBefore(today);
