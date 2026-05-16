@@ -36,12 +36,22 @@ class CookNowDeductionService {
     required String userId,
     required String recipeTitle,
     required List<String> ingredients,
+    required int portions,
   }) async {
     try {
       if (ingredients.isEmpty) {
         return const CookNowDeductionResult(
           success: false,
           message: 'No recipe ingredients found.',
+          usedItems: [],
+          skippedItems: [],
+        );
+      }
+
+      if (portions <= 0) {
+        return const CookNowDeductionResult(
+          success: false,
+          message: 'Please select at least 1 portion.',
           usedItems: [],
           skippedItems: [],
         );
@@ -85,15 +95,24 @@ class CookNowDeductionService {
           continue;
         }
 
-        final newQuantity = quantity - 1;
+        if (quantity < portions) {
+          skippedItems.add('$itemName only has $quantity left');
+          continue;
+        }
+
+        final newQuantity = quantity - portions;
 
         await matchedDoc.reference.update({'quantity': newQuantity});
 
-        await _addInventoryRecord(itemName: itemName, quantity: 1);
+        await _addInventoryRecord(itemName: itemName, quantity: portions);
 
-        await _addActivity(itemName: itemName, recipeTitle: recipeTitle);
+        await _addActivity(
+          itemName: itemName,
+          recipeTitle: recipeTitle,
+          portions: portions,
+        );
 
-        usedItems.add(itemName);
+        usedItems.add('$itemName x$portions');
       }
 
       if (usedItems.isEmpty) {
@@ -159,11 +178,12 @@ class CookNowDeductionService {
   Future<void> _addActivity({
     required String itemName,
     required String recipeTitle,
+    required int portions,
   }) async {
     await _activitiesRef.add({
       'type': 'stock_out',
       'title': 'Used $itemName',
-      'subtitle': '$itemName used for $recipeTitle',
+      'subtitle': '$itemName used for $recipeTitle ($portions portion)',
       'createdAt': Timestamp.now(),
     });
   }
@@ -192,7 +212,6 @@ class CookNowDeductionService {
 
   bool _isExpired(DateTime expiryDate) {
     final now = DateTime.now();
-
     final today = DateTime(now.year, now.month, now.day);
 
     final expiry = DateTime(expiryDate.year, expiryDate.month, expiryDate.day);

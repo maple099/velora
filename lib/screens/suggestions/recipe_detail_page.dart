@@ -37,6 +37,10 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
   Future<void> _handleCookNow() async {
     if (_isCooking) return;
 
+    final portions = await _showPortionDialog();
+
+    if (portions == null || portions <= 0) return;
+
     setState(() => _isCooking = true);
 
     try {
@@ -65,6 +69,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
             userId: user.uid,
             recipeTitle: widget.title,
             ingredients: widget.ingredients,
+            portions: portions,
           )
           .timeout(
             const Duration(seconds: 10),
@@ -93,6 +98,121 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
         isError: true,
       );
     }
+  }
+
+  Future<int?> _showPortionDialog() async {
+    int portions = 1;
+
+    return showDialog<int>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              title: const Text(
+                'Cook Now',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'How many portions/orders did you cook?',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontWeight: FontWeight.w600,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconButton(
+                          onPressed: portions <= 1
+                              ? null
+                              : () {
+                                  setDialogState(() => portions--);
+                                },
+                          icon: const Icon(Icons.remove_circle_outline),
+                          color: const Color(0xFF7C3AED),
+                        ),
+                        Container(
+                          width: 64,
+                          alignment: Alignment.center,
+                          child: Text(
+                            portions.toString(),
+                            style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF111827),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: portions >= 10
+                              ? null
+                              : () {
+                                  setDialogState(() => portions++);
+                                },
+                          icon: const Icon(Icons.add_circle_outline),
+                          color: const Color(0xFF7C3AED),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Velora will deduct this amount from each matched ingredient.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFF9CA3AF),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, portions),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF7C3AED),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'Confirm',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   void _showSnackBar({required String message, required bool isError}) {
